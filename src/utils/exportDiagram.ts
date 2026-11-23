@@ -22,19 +22,26 @@ function prepareExportConfig(nodes: CircuitNode[], options?: ExportOptions) {
     throw new Error('Could not find React Flow viewport element on the canvas.');
   }
 
-  const padding = options?.padding ?? 48;
-  const nodesBounds = getNodesBounds(nodes);
+  const padding = 120;
+  const rawBounds = getNodesBounds(nodes);
 
-  const imageWidth = Math.max(Math.ceil(nodesBounds.width + padding * 2), 480);
-  const imageHeight = Math.max(Math.ceil(nodesBounds.height + padding * 2), 320);
+  const bounds = {
+    x: rawBounds.x - padding,
+    y: rawBounds.y - padding,
+    width: rawBounds.width + padding * 2,
+    height: rawBounds.height + padding * 2,
+  };
+
+  const imageWidth = Math.max(Math.ceil(bounds.width), 480);
+  const imageHeight = Math.max(Math.ceil(bounds.height), 320);
 
   const viewport = getViewportForBounds(
-    nodesBounds,
+    bounds,
     imageWidth,
     imageHeight,
     0.2,
     2.5,
-    padding
+    0
   );
 
   const backgroundColor = options?.isLightMode ? '#ffffff' : '#0b1120';
@@ -47,6 +54,16 @@ function prepareExportConfig(nodes: CircuitNode[], options?: ExportOptions) {
       width: `${imageWidth}px`,
       height: `${imageHeight}px`,
       transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+    },
+    onClone: (clone: HTMLElement) => {
+      const viewport = clone.querySelector<HTMLElement>('.react-flow__viewport');
+      if (viewport) {
+        viewport.style.overflow = 'visible';
+      }
+      const edges = clone.querySelector<HTMLElement>('.react-flow__edges');
+      if (edges) {
+        edges.style.overflow = 'visible';
+      }
     },
     filter: (node: HTMLElement) => {
       if (!node.classList) return true;
