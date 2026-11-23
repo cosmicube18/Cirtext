@@ -1,11 +1,21 @@
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled.js';
-import type { CircuitGraph } from '../types/circuit.ts';
+import type { ComponentType, CircuitGraph } from '../types/circuit.ts';
+import { COMPONENT_METADATA } from '../types/circuit.ts';
 
 const elk = new ELK();
+
+const PIN_SIDE_TO_ELK: Record<'top' | 'bottom' | 'left' | 'right', string> = {
+  top: 'NORTH',
+  bottom: 'SOUTH',
+  left: 'WEST',
+  right: 'EAST',
+};
 
 /**
  * Calculates non-overlapping (x, y) coordinates for all circuit components
  * using ELK's layered orthogonal DAG algorithm (left-to-right electronic flow).
+ * Wires are routed orthogonally with generous spacing so they never cross
+ * component bodies and parallel wires fan out into separate lanes.
  */
 export async function calculateAutoLayout(
   graph: CircuitGraph
@@ -34,17 +44,31 @@ export async function calculateAutoLayout(
 
   const elkChildren = graph.components.map((comp) => {
     const dims = getComponentDimensions(comp.type);
+    const meta = COMPONENT_METADATA[comp.type as ComponentType];
+    const ports = meta?.pins.map((pin) => ({
+      id: pin.id,
+      width: 4,
+      height: 4,
+      layoutOptions: {
+        'elk.portConstraints': 'FIXED_SIDE',
+        'elk.port.side': PIN_SIDE_TO_ELK[pin.position],
+      },
+    })) || [];
+
     return {
       id: comp.id,
       width: dims.width,
       height: dims.height,
+      ports,
     };
   });
 
-  const elkEdges = graph.connections.map((conn, index) => ({
-    id: `elk_edge_${index}_${conn.sourceComponentId}_${conn.targetComponentId}`,
-    sources: [conn.sourceComponentId],
-    targets: [conn.targetComponentId],
+  const elkEdges = graph.connections.map((conn) => ({
+    id: `elk_edge_${conn.sourceComponentId}_${conn.sourcePinId}_${conn.targetComponentId}_${conn.targetPinId}`,
+    source: conn.sourceComponentId,
+    sourcePort: conn.sourcePinId,
+    target: conn.targetComponentId,
+    targetPort: conn.targetPinId,
   }));
 
   const rootNode: ElkNode = {
@@ -52,14 +76,18 @@ export async function calculateAutoLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '96',
-      'elk.spacing.nodeNode': '64',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '140',
+      'elk.spacing.nodeNode': '90',
+      'elk.spacing.edgeNode': '40',
+      'elk.spacing.edgeEdge': '20',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'elk.portConstraints': 'FIXED_SIDE',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.padding': '[top=64,left=64,bottom=64,right=64]',
     },
     children: elkChildren,
-    edges: elkEdges,
+    edges: elkEdges as any,
   };
 
   try {

@@ -10,4 +10,6 @@ export interface CircuitNodeData extends Record<string, unknown> {
 }
 
 export type CircuitNode = Node<CircuitNodeData>;
-export type CircuitEdge = Edge<{ netLabel?: string }>;
+export type CircuitEdge = Edge<{ netLabel?: string }> & {
+  pathOptions?: { borderRadius: number; offset: number };
+};

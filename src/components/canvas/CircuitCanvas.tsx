@@ -75,6 +75,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
             width: 14,
             height: 14,
           },
+          pathOptions: { borderRadius: 12, offset: 25 },
         };
         onEdgesUpdate(addEdge(newEdge, edges) as CircuitEdge[]);
       }
@@ -172,7 +173,8 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: { stroke: '#94a3b8', strokeWidth: 2.2 },
-        }}
+          pathOptions: { borderRadius: 12, offset: 25 },
+        } as any}
       >
         <Background
           variant={BackgroundVariant.Dots}

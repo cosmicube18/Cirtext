@@ -53,28 +53,41 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
     },
   }));
 
-  const edges: CircuitEdge[] = graph.connections.map((conn) => ({
-    id: conn.id,
-    source: conn.sourceComponentId,
-    sourceHandle: conn.sourcePinId,
-    target: conn.targetComponentId,
-    targetHandle: conn.targetPinId,
-    type: 'smoothstep',
-    label: conn.netLabel,
-    labelStyle: conn.netLabel
-      ? { fill: '#38bdf8', fontWeight: 600, fontSize: 11 }
-      : undefined,
-    labelBgStyle: conn.netLabel
-      ? { fill: '#0f172a', stroke: '#334155', strokeWidth: 1 }
-      : undefined,
-    style: { stroke: '#38bdf8', strokeWidth: 2.2 },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: '#38bdf8',
-      width: 14,
-      height: 14,
-    },
-  }));
+  const edges: CircuitEdge[] = graph.connections.map((conn) => {
+    // Vary path offset based on source pin index so multiple wires
+    // leaving the same side of a component fan out into separate lanes.
+    const sourceComp = graph.components.find((c) => c.id === conn.sourceComponentId);
+    const sourceMeta = sourceComp ? COMPONENT_METADATA[sourceComp.type] : undefined;
+    const sourcePinIndex = sourceMeta?.pins.findIndex((p) => p.id === conn.sourcePinId) ?? 0;
+    const pinLaneOffset = Math.max(sourcePinIndex, 0) * 6;
+
+    return {
+      id: conn.id,
+      source: conn.sourceComponentId,
+      sourceHandle: conn.sourcePinId,
+      target: conn.targetComponentId,
+      targetHandle: conn.targetPinId,
+      type: 'smoothstep',
+      label: conn.netLabel,
+      labelStyle: conn.netLabel
+        ? { fill: '#38bdf8', fontWeight: 600, fontSize: 11 }
+        : undefined,
+      labelBgStyle: conn.netLabel
+        ? { fill: '#0f172a', stroke: '#334155', strokeWidth: 1 }
+        : undefined,
+      style: { stroke: '#38bdf8', strokeWidth: 2.2 },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#38bdf8',
+        width: 14,
+        height: 14,
+      },
+      pathOptions: {
+        borderRadius: 12,
+        offset: 25 + pinLaneOffset,
+      },
+    };
+  });
 
   return { nodes, edges };
 }

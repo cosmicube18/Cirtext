@@ -39,11 +39,30 @@ html, body, #root {
 .react-flow__edge-path {
   stroke: #94a3b8;
   stroke-width: 2.25;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #38bdf8;
+  stroke-width: 3.5;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: #38bdf8;
-  stroke-width: 3;
+  stroke-width: 4;
+}
+
+/* Bring hovered / selected wires to front */
+.react-flow__edge:hover,
+.react-flow__edge.selected {
+  z-index: 1000;
+}
+
+/* Highlight handles connected to selected edge */
+.react-flow__node.selected .react-flow__handle {
+  background-color: #38bdf8 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.9);
 }
 
 .react-flow__controls {
