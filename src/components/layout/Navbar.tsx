@@ -126,43 +126,44 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
   };
 
   return (
-    <header className="h-14 border-b border-slate-800 bg-slate-900/95 px-4 flex items-center justify-between z-20 shrink-0 select-none shadow-sm">
+    <header className="min-h-14 py-2 px-3 md:px-4 border-b border-slate-800 bg-slate-900/95 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 z-20 shrink-0 select-none shadow-sm">
       {/* Brand & Title */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-400/80 flex items-center justify-center font-bold text-sky-400 shadow-sm shadow-sky-500/10">
-          <Cpu className="w-5 h-5 text-sky-400" />
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-400/80 flex items-center justify-center font-bold text-sky-400 shadow-sm shadow-sky-500/10 shrink-0">
+          <Cpu className="w-4 h-4 md:w-5 md:h-5 text-sky-400" />
         </div>
         <div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm tracking-tight text-slate-100">
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <span className="font-semibold text-xs md:text-sm tracking-tight text-slate-100">
               Cirtext
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60">
-              CAD Schematic
+            <span className="text-[9px] md:text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800/60">
+              CAD
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-none">
-            Bi-Directional Canvas & AI-Readable Text Editor
+          <p className="hidden sm:block text-[10px] md:text-[11px] text-slate-400 leading-none">
+            Bi-Directional Canvas & AI-Readable Text
           </p>
         </div>
       </div>
 
       {/* Center Sample Selector */}
-      <div className="relative">
+      <div className="relative order-2 sm:order-none">
         <button
           onClick={() => {
             setSampleMenuOpen(!sampleMenuOpen);
             setExportMenuOpen(false);
           }}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-800/90 border border-slate-700 hover:border-slate-600 text-xs text-slate-200 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800/90 border border-slate-700 hover:border-slate-600 text-xs text-slate-200 transition-colors"
         >
-          <Layers className="w-3.5 h-3.5 text-sky-400" />
-          <span>Load Example Circuit</span>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          <Layers className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          <span className="hidden sm:inline">Load Example Circuit</span>
+          <span className="sm:hidden text-[11px]">Examples</span>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         </button>
 
         {sampleMenuOpen && (
-          <div className="absolute top-full left-0 mt-1 w-72 rounded-md bg-slate-900 border border-slate-700 shadow-2xl py-1 z-50">
+          <div className="absolute top-full left-0 sm:left-auto right-auto sm:right-0 mt-1 w-72 max-w-[calc(100vw-24px)] rounded-md bg-slate-900 border border-slate-700 shadow-2xl py-1 z-50">
             {SAMPLE_CIRCUITS.map((sample) => (
               <button
                 key={sample.id}
@@ -192,26 +193,28 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
       </div>
 
       {/* Action Toolbar */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-1.5 md:gap-2">
         {/* Validate Connections Button */}
         <button
           onClick={handleValidate}
-          title="Validate all connection endpoints and check for floating nodes"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
+          title="Validate all connection endpoints"
+          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
         >
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Validate Connections</span>
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="hidden lg:inline">Validate Connections</span>
+          <span className="hidden sm:inline lg:hidden">Validate</span>
         </button>
 
         {/* ELK Auto Layout Button */}
         <button
           onClick={() => void applyAutoLayout()}
           disabled={isLayoutRunning}
-          title="Compute orthogonal non-overlapping coordinates via ELKjs"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-medium text-xs shadow-sm shadow-sky-500/20 transition-colors"
+          title="Compute orthogonal coordinates via ELKjs"
+          className="flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-medium text-xs shadow-sm shadow-sky-500/20 transition-colors"
         >
-          <Wand2 className={`w-3.5 h-3.5 ${isLayoutRunning ? 'animate-spin' : ''}`} />
-          <span>{isLayoutRunning ? 'Layouting...' : 'Auto-Layout'}</span>
+          <Wand2 className={`w-3.5 h-3.5 shrink-0 ${isLayoutRunning ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{isLayoutRunning ? 'Layouting...' : 'Auto-Layout'}</span>
+          <span className="sm:hidden text-[11px]">Auto</span>
         </button>
 
         {/* Export Dropdown Button */}
@@ -223,19 +226,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
             }}
             disabled={isExporting}
             title="Download or Print full resolution diagram"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
           >
             {isExporting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400 shrink-0" />
             ) : (
-              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <Download className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             )}
-            <span>Export</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
+            <span className="hidden sm:inline">Export</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 
           {exportMenuOpen && (
-            <div className="absolute top-full right-0 mt-1 w-64 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1.5 z-50 flex flex-col">
+            <div className="absolute top-full right-0 mt-1 w-60 max-w-[calc(100vw-24px)] rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1.5 z-50 flex flex-col">
               <div className="px-3 py-1 border-b border-slate-800/80 mb-1 flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Export Schematic
@@ -254,13 +257,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
                 className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between transition-colors group"
               >
                 <div className="flex items-center gap-2">
-                  <Image className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                  <Image className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
                   <div className="flex flex-col">
                     <span className="text-xs font-medium text-slate-200">
                       Download PNG
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      High-resolution raster image
+                      High-res raster image
                     </span>
                   </div>
                 </div>
@@ -276,13 +279,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
                 className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between transition-colors group"
               >
                 <div className="flex items-center gap-2">
-                  <FileCode2 className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <FileCode2 className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
                   <div className="flex flex-col">
                     <span className="text-xs font-medium text-slate-200">
                       Download SVG
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      Crisp vector graphic
+                      Vector graphic
                     </span>
                   </div>
                 </div>
@@ -298,13 +301,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
                 className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between transition-colors group border-b border-slate-800/80"
               >
                 <div className="flex items-center gap-2">
-                  <Printer className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <Printer className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
                   <div className="flex flex-col">
                     <span className="text-xs font-medium text-slate-200">
                       Print / Save as PDF
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      Print-ready landscape layout
+                      Print-ready landscape
                     </span>
                   </div>
                 </div>
@@ -329,11 +332,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
         {/* AI Helper Button */}
         <button
           onClick={onOpenAiPrompt}
-          title="Format current circuit with AI system prompt instructions"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-600/90 hover:bg-purple-500 text-purple-100 border border-purple-400/40 text-xs font-medium transition-colors"
+          title="Format current circuit with AI instructions"
+          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-purple-600/90 hover:bg-purple-500 text-purple-100 border border-purple-400/40 text-xs font-medium transition-colors"
         >
-          <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-          <span>Copy with AI Instructions</span>
+          <Sparkles className="w-3.5 h-3.5 text-purple-300 shrink-0" />
+          <span className="hidden md:inline">Copy with AI Instructions</span>
+          <span className="md:hidden text-[11px]">AI Prompt</span>
         </button>
 
         {/* Clear All Circuit Button */}
@@ -348,10 +352,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
             }
           }}
           title="Clear the entire schematic canvas and DSL (Reset)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-800/50 text-xs font-medium transition-colors"
+          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-800/50 text-xs font-medium transition-colors"
         >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>Clear All</span>
+          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">Clear All</span>
         </button>
       </div>
 
