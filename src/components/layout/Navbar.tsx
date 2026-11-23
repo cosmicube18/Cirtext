@@ -20,9 +20,10 @@ import { downloadDiagram, printDiagram } from '../../utils/exportDiagram.ts';
 
 export interface NavbarProps {
   onOpenAiPrompt: () => void;
+  onToggleAiPanel?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt, onToggleAiPanel }) => {
   const { graph, nodes, diagnostics, applyAutoLayout, isLayoutRunning, loadSample, clearCircuit } =
     useCircuitStore();
   const [sampleMenuOpen, setSampleMenuOpen] = useState(false);
@@ -328,6 +329,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
             </div>
           )}
         </div>
+
+        {/* AI Assistant Button */}
+        {onToggleAiPanel && (
+          <button
+            onClick={onToggleAiPanel}
+            title="Open Gemini AI Circuit Assistant"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/60 text-xs font-semibold shadow-md shadow-purple-900/20 transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-200 shrink-0 animate-pulse" />
+            <span className="hidden sm:inline">AI Assistant</span>
+            <span className="sm:hidden text-[11px]">AI</span>
+          </button>
+        )}
 
         {/* AI Helper Button */}
         <button
