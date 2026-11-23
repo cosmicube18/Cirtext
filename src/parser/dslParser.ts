@@ -43,8 +43,8 @@ export function parseDsl(dslText: string, existingGraph?: CircuitGraph): ParseRe
   let currentSection: ParserSection = 'PREAMBLE';
   let title = existingGraph?.title || 'Untitled Circuit';
 
-  // Component regex: e.g., "V1: VoltageSource (5V)" or "GND: Ground" or "R1: Resistor (10k) [Label: Pullup]"
-  const componentRegex = /^([A-Za-z0-9_]+)\s*:\s*([A-Za-z0-9_]+)(?:\s*\(([^)]+)\))?(?:\s*\[(?:Label:\s*)?([^\]]+)\])?$/i;
+  // Component regex: e.g., "V1: VoltageSource (5V)" or "GND: Ground" or "U1: ESP32_30Pin () [Label: Controller]"
+  const componentRegex = /^([A-Za-z0-9_]+)\s*:\s*([A-Za-z0-9_]+)(?:\s*\(([^)]*)\))?(?:\s*\[(?:Label:\s*)?([^\]]*)\])?$/i;
 
   // Connection regex: e.g., "V1.pos -> R1.1" or "R1.2 -> R2.1 [Label: V_out]"
   const connectionRegex = /^([A-Za-z0-9_]+)\.([A-Za-z0-9_+\-]+)\s*(?:->|-->|to)\s*([A-Za-z0-9_]+)\.([A-Za-z0-9_+\-]+)(?:\s*\[(?:Label:\s*)?([^\]]+)\])?$/i;
@@ -132,7 +132,7 @@ export function parseDsl(dslText: string, existingGraph?: CircuitGraph): ParseRe
         id: rawId,
         type: normalizedType,
         value: rawValue?.trim() || COMPONENT_METADATA[normalizedType].defaultValue,
-        label: rawLabel?.trim(),
+        label: rawLabel?.trim() || undefined,
         position: prevPos ? { x: prevPos.x, y: prevPos.y } : { x: 0, y: 0 },
         rotation: prevPos?.rotation ?? 0,
       };

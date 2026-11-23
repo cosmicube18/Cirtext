@@ -113,7 +113,21 @@ R1.3 -> R2.1`;
   );
   console.log('✓ Test 8 Passed: Individual wire and component deletion cleanly synced to DSL');
 
-  console.log('--- All 8 Parser, Serializer, Layout & Deletion Tests Passed! ---');
+  // Test 9: Forgiving component parsing with empty parentheses () and [Label: ...]
+  const forgivingDsl = `[COMPONENTS]
+U1: ESP32_30Pin () [Label: ESP32_Controller]
+GND1: Ground ()
+
+[CONNECTIONS]
+U1.GND -> GND1.1`;
+  const result9 = parseDsl(forgivingDsl);
+  console.assert(result9.isValid, 'Expected forgivingDsl to be valid');
+  console.assert(result9.diagnostics.length === 0, `Expected 0 diagnostics, got ${JSON.stringify(result9.diagnostics)}`);
+  console.assert(result9.graph.components.length === 2, `Expected 2 components, got ${result9.graph.components.length}`);
+  console.assert(result9.graph.components[0].label === 'ESP32_Controller', `Expected label ESP32_Controller, got ${result9.graph.components[0].label}`);
+  console.log('✓ Test 9 Passed: Empty parentheses () and [Label: ...] on components parsed cleanly');
+
+  console.log('--- All 9 Parser, Serializer, Layout & Deletion Tests Passed! ---');
 }
 
 runTests();

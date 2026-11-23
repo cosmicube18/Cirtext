@@ -30,7 +30,8 @@ Here are the strict syntax rules:
    [CONNECTIONS]
 
 2. COMPONENTS SYNTAX:
-   <ID>: <Type> (<Value>) [Label: OptionalLabel]
+   <ID>: <Type> (<Value>)
+   IMPORTANT: NEVER use empty parentheses \`()\` and NEVER put \`[Label: ...]\` on \`[COMPONENTS]\` lines. Put descriptive names inside the parentheses like \`U1: ESP32_30Pin (Controller)\` or omit parentheses completely like \`GND1: Ground\`.
    Supported Component Types and their allowed pin names:
    - ESP32_30Pin:
        left pins: "EN", "VP", "VN", "D34", "D35", "D32", "D33", "D25", "D26", "D27", "D14", "D12", "D13", "GND", "VIN"
