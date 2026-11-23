@@ -28,17 +28,21 @@ export async function calculateAutoLayout(
   const getComponentDimensions = (type: string) => {
     switch (type) {
       case 'ESP32_30Pin':
-        return { width: 240, height: 460 };
+        return { width: 320, height: 640 };
       case 'OLED_SSD1306':
-        return { width: 200, height: 180 };
       case 'SCD41':
       case 'BH1750':
       case 'SHT31':
-        return { width: 180, height: 180 };
+        return { width: 240, height: 180 };
+      case 'VoltageSource':
+      case 'Resistor':
+      case 'Capacitor':
+      case 'LED':
       case 'Switch':
-        return { width: 110, height: 70 };
+      case 'Ground':
+        return { width: 180, height: 120 };
       default:
-        return { width: 110, height: 80 };
+        return { width: 180, height: 120 };
     }
   };
 
@@ -76,9 +80,9 @@ export async function calculateAutoLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '140',
-      'elk.spacing.nodeNode': '90',
-      'elk.spacing.edgeNode': '40',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '180',
+      'elk.spacing.nodeNode': '100',
+      'elk.spacing.edgeNode': '50',
       'elk.spacing.edgeEdge': '20',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -112,9 +116,11 @@ export async function calculateAutoLayout(
     // Fallback: grid distribution if ELK fails
     const fallbackPositions: Record<string, { x: number; y: number }> = {};
     graph.components.forEach((comp, idx) => {
+      const col = idx % 3;
+      const row = Math.floor(idx / 3);
       fallbackPositions[comp.id] = {
-        x: 80 + (idx % 3) * 160,
-        y: 80 + Math.floor(idx / 3) * 120,
+        x: 120 + col * 340,
+        y: 120 + row * 260,
       };
     });
     return fallbackPositions;

@@ -23,7 +23,7 @@ export interface CircuitState {
   isLayoutRunning: boolean;
 
   // Actions
-  setDslText: (text: string) => void;
+  setDslText: (text: string) => Promise<void>;
   updateNodes: (nodes: CircuitNode[]) => void;
   updateEdges: (edges: CircuitEdge[]) => void;
   connectPins: (connection: Connection) => void;
@@ -121,7 +121,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   lastUpdatedBy: 'initial',
   isLayoutRunning: false,
 
-  setDslText: (newText: string) => {
+  setDslText: async (newText: string) => {
     const currentGraph = get().graph;
     const result = parseDsl(newText, currentGraph);
 
@@ -141,13 +141,14 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       lastUpdatedBy: 'text',
     });
 
-    // Auto-layout if freshly pasted text has all components at origin
+    // Auto-layout whenever newly parsed text has components lacking spatial
+    // coordinates (all at origin), so the schematic never renders overlapping.
     if (
       hasUnpositionedNodes &&
       result.graph.components.length > 0 &&
       result.isValid
     ) {
-      void get().applyAutoLayout();
+      await get().applyAutoLayout();
     }
   },
 
