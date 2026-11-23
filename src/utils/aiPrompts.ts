@@ -1,0 +1,55 @@
+/**
+ * Prepares the current circuit DSL wrapped in a specialized prompt
+ * with strict syntax rules for ChatGPT, Claude, and Gemini.
+ */
+export function generateAiPrompt(dslText: string): string {
+  return `You are an expert Electronic Circuit Designer and DSL Assistant.
+
+I have a circuit diagram written in a custom, human- and LLM-readable text format (DSL).
+Here are the strict syntax rules:
+
+1. SECTION HEADERS:
+   The circuit consists of two sections:
+   [COMPONENTS]
+   [CONNECTIONS]
+
+2. COMPONENTS SYNTAX:
+   <ID>: <Type> (<Value>)
+   Supported Component Types and their allowed pin names:
+   - ESP32_30Pin:
+       left pins: "EN", "VP", "VN", "D34", "D35", "D32", "D33", "D25", "D26", "D27", "D14", "D12", "D13", "GND", "VIN"
+       right pins: "3V3", "GND" (or GND2), "D15", "D2", "D4", "RX2", "TX2", "D5", "D18", "D19", "GPIO21", "RX0", "TX0", "GPIO22", "D23"
+   - SCD41: pins "VCC", "GND", "SCL", "SDA"
+   - BH1750: pins "VCC", "GND", "SCL", "SDA", "ADDR"
+   - SHT31: pins "VCC", "GND", "SCL", "SDA", "ADDR"
+   - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
+   - Switch: pins "1", "2"
+   - VoltageSource: pins "pos", "neg"
+   - Resistor: pins "1", "2"
+   - Capacitor: pins "1", "2"
+   - LED: pins "anode", "cathode"
+   - Ground: pin "1"
+
+3. CONNECTIONS SYNTAX:
+   <ComponentA>.<PinA> -> <ComponentB>.<PinB> [Label: OptionalLabel]
+   Examples:
+   U1.3V3 -> SW1.1
+   SW1.2 -> U2.VCC [Label: 3V3_Switched]
+   U1.GPIO21 -> U2.SDA [Label: I2C_SDA]
+   U1.GPIO22 -> U2.SCL [Label: I2C_SCL]
+
+----------------------
+CURRENT CIRCUIT DSL:
+----------------------
+\`\`\`text
+${dslText.trim()}
+\`\`\`
+
+----------------------
+YOUR TASK:
+----------------------
+Please analyze this circuit and modify or expand it according to my request below.
+IMPORTANT: When responding with the updated circuit, output ONLY the valid DSL inside a \`\`\`text code block so I can paste it directly back into my editor.
+
+[USER REQUEST]: `;
+}
