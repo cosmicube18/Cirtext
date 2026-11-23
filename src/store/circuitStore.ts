@@ -59,7 +59,7 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
     const sourceComp = graph.components.find((c) => c.id === conn.sourceComponentId);
     const sourceMeta = sourceComp ? COMPONENT_METADATA[sourceComp.type] : undefined;
     const sourcePinIndex = sourceMeta?.pins.findIndex((p) => p.id === conn.sourcePinId) ?? 0;
-    const pinLaneOffset = Math.max(sourcePinIndex, 0) * 6;
+    const pinLaneOffset = Math.max(sourcePinIndex, 0) * 4;
 
     return {
       id: conn.id,
@@ -83,8 +83,8 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
         height: 14,
       },
       pathOptions: {
-        borderRadius: 12,
-        offset: 25 + pinLaneOffset,
+        borderRadius: 8,
+        offset: 12 + pinLaneOffset,
       },
     };
   });

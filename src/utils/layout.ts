@@ -33,14 +33,14 @@ export async function calculateAutoLayout(
       case 'SCD41':
       case 'BH1750':
       case 'SHT31':
-        return { width: 240, height: 180 };
+        return { width: 240, height: 200 };
       case 'VoltageSource':
       case 'Resistor':
       case 'Capacitor':
       case 'LED':
       case 'Switch':
       case 'Ground':
-        return { width: 180, height: 120 };
+        return { width: 180, height: 130 };
       default:
         return { width: 180, height: 120 };
     }
@@ -80,8 +80,8 @@ export async function calculateAutoLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '180',
-      'elk.spacing.nodeNode': '100',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '160',
+      'elk.spacing.nodeNode': '60',
       'elk.spacing.edgeNode': '50',
       'elk.spacing.edgeEdge': '20',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',

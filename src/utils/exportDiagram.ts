@@ -154,18 +154,23 @@ export async function printDiagram(
         <style>
           @page {
             size: landscape;
-            margin: 1.2cm;
+            margin: 10mm;
           }
           * {
             box-sizing: border-box;
           }
           body {
             margin: 0;
-            padding: 16px;
+            padding: 0;
+            height: 95vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             background: #ffffff;
             color: #0f172a;
-            text-align: center;
           }
           header {
             display: flex;
@@ -196,7 +201,10 @@ export async function printDiagram(
           }
           img {
             max-width: 100%;
-            max-height: 80vh;
+            max-height: 82vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
