@@ -25,7 +25,8 @@ export interface SimulationResult {
 export function runCircuitSimulation(
   graph: CircuitGraph,
   switchStates: Record<string, boolean>,
-  flipFlopStates: FlipFlopStates = {}
+  flipFlopStates: FlipFlopStates = {},
+  clockHigh: boolean = false
 ): SimulationResult {
   const pinStates: Record<string, 0 | 1> = {};
   const isGrounded: Record<string, boolean> = {};
@@ -58,6 +59,8 @@ export function runCircuitSimulation(
       const saved = flipFlopStates[comp.id];
       pinStates[`${comp.id}.Q`] = saved?.q ? 1 : 0;
       pinStates[`${comp.id}.Q_BAR`] = saved?.q ? 0 : 1;
+    } else if (comp.type === 'Clock') {
+      pinStates[`${comp.id}.OUT`] = clockHigh ? 1 : 0;
     }
   }
 
@@ -169,8 +172,8 @@ export function runCircuitSimulation(
     }
 
     // For each net, find driver outputs and propagate their value to all pins in the net
-    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR
-    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR']);
+    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR, Clock OUT
+    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR', 'OUT']);
     for (const net of nets) {
       let driverValue: 0 | 1 | null = null;
       let hasDriver = false;

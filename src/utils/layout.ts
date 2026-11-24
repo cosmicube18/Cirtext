@@ -45,6 +45,8 @@ export async function calculateAutoLayout(
       case 'D_FlipFlop':
       case 'JK_FlipFlop':
         return { width: 180, height: 150 };
+      case 'Clock':
+        return { width: 150, height: 110 };
       case 'VoltageSource':
       case 'Resistor':
       case 'Capacitor':

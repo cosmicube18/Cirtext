@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, X, Layers } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ChevronLeft, X, Layers } from 'lucide-react';
 import type { ComponentType } from '../../types/circuit.ts';
 import { COMPONENT_METADATA } from '../../types/circuit.ts';
 import { useCircuitStore } from '../../store/circuitStore.ts';
@@ -16,7 +16,7 @@ const PALETTE_GROUPS: PaletteGroup[] = [
   },
   {
     name: 'Sequential Logic',
-    items: ['D_FlipFlop', 'JK_FlipFlop'],
+    items: ['Clock', 'D_FlipFlop', 'JK_FlipFlop'],
   },
   {
     name: 'Microcontrollers',
@@ -32,7 +32,15 @@ const PALETTE_GROUPS: PaletteGroup[] = [
   },
 ];
 
-export const ComponentPalette: React.FC = () => {
+export interface ComponentPaletteProps {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export const ComponentPalette: React.FC<ComponentPaletteProps> = ({
+  collapsed = false,
+  onToggleCollapse,
+}) => {
   const { addComponent } = useCircuitStore();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -48,6 +56,9 @@ export const ComponentPalette: React.FC = () => {
       setIsOpenMobile(false);
     }
   };
+
+  // When collapsed, render nothing (App shows the restore button)
+  if (collapsed) return null;
 
   return (
     <>
@@ -66,7 +77,7 @@ export const ComponentPalette: React.FC = () => {
 
       {/* Palette Container: visible on desktop, modal drawer on mobile */}
       <div
-        className={`absolute top-3 left-3 z-20 flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-slate-800 shadow-2xl max-h-[82vh] overflow-y-auto w-60 select-none transition-all duration-200 ${
+        className={`absolute top-3 left-3 z-20 flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-slate-800 shadow-2xl w-60 select-none transition-all duration-200 ${
           isOpenMobile ? 'block' : 'hidden md:block'
         }`}
       >
@@ -77,6 +88,14 @@ export const ComponentPalette: React.FC = () => {
               Component Library
             </span>
           </div>
+          {/* Collapse button */}
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            title="Collapse Component Library"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
           {/* Close button on mobile */}
           <button
             onClick={() => setIsOpenMobile(false)}

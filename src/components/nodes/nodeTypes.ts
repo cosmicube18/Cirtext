@@ -10,6 +10,7 @@ import { MultiPinModuleNode } from './MultiPinModuleNode.tsx';
 import { OledNode } from './OledNode.tsx';
 import { LogicGateNode } from './LogicGateNode.tsx';
 import { FlipFlopNode } from './FlipFlopNode.tsx';
+import { ClockNode } from './ClockNode.tsx';
 
 export const circuitNodeTypes: NodeTypes = {
   // Passives & Sources
@@ -28,6 +29,9 @@ export const circuitNodeTypes: NodeTypes = {
   NAND: LogicGateNode,
   XOR: LogicGateNode,
   XNOR: LogicGateNode,
+
+  // Clock Generators
+  Clock: ClockNode,
 
   // Sequential Logic (Flip-Flops)
   D_FlipFlop: FlipFlopNode,

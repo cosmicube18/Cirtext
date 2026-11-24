@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Cpu, FileCode, Sparkles } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Cpu, FileCode, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Navbar } from './components/layout/Navbar.tsx';
 import { ComponentPalette } from './components/layout/ComponentPalette.tsx';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas.tsx';
@@ -22,8 +22,44 @@ export const App: React.FC = () => {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'text' | 'ai'>('ai');
   const [mobileTab, setMobileTab] = useState<'canvas' | 'text' | 'ai'>('canvas');
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(420);
+  const [isResizing, setIsResizing] = useState(false);
 
   const hasErrors = diagnostics.some((d) => d.severity === 'error');
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const main = document.getElementById('main-container');
+      if (!main) return;
+      const rect = main.getBoundingClientRect();
+      const newWidth = rect.right - e.clientX;
+      setRightPanelWidth(Math.min(Math.max(newWidth, 320), 720));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'auto';
+    };
+  }, [isResizing]);
 
   return (
     <div
@@ -33,25 +69,25 @@ export const App: React.FC = () => {
       {/* Top CAD Navigation */}
       <Navbar
         onOpenAiPrompt={() => setIsAiModalOpen(true)}
-        onToggleAiPanel={() => {
-          setActiveRightTab('ai');
-          setMobileTab('ai');
-        }}
       />
 
       {/* Main Split-Screen Workspace */}
-      <main className="flex-1 w-full min-h-0 flex overflow-hidden">
-        {/* Left: Interactive Canvas View (full on mobile when active; 58% on desktop) */}
+      <main
+        id="main-container"
+        className="flex-1 w-full min-h-0 flex overflow-hidden relative"
+        style={{ height: '100%' }}
+      >
+        {/* Left: Interactive Canvas View + Component Palette */}
         <section
-          className={`relative h-full min-w-0 min-h-0 border-r border-slate-800 bg-slate-950 overflow-hidden ${
-            mobileTab === 'canvas' ? 'flex flex-1 w-full' : 'hidden md:flex md:flex-1'
-          }`}
+          className={`relative h-full min-w-0 min-h-0 bg-slate-950 overflow-hidden flex-1 ${mobileTab !== 'canvas' ? 'hidden md:flex' : ''}`}
           style={{ height: '100%' }}
         >
-          {/* Quick Component Palette Drawer */}
-          <ComponentPalette />
-
-          {/* Canvas Component */}
+          {!leftPanelCollapsed && (
+            <ComponentPalette
+              collapsed={leftPanelCollapsed}
+              onToggleCollapse={() => setLeftPanelCollapsed(true)}
+            />
+          )}
           <CircuitCanvas
             nodes={nodes}
             edges={edges}
@@ -61,62 +97,95 @@ export const App: React.FC = () => {
             onNodesDelete={deleteNodes}
             onEdgesDelete={deleteEdges}
           />
+          {leftPanelCollapsed && (
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              className="absolute top-3 left-3 z-50 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/95 border border-slate-700 text-sky-400 text-xs font-semibold shadow-2xl backdrop-blur-md"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-medium">Components</span>
+            </button>
+          )}
         </section>
+
+        {/* Drag-to-resize handle (desktop only) */}
+        {!rightPanelCollapsed && mobileTab === 'canvas' && (
+          <div
+            className="hidden md:block w-[4px] cursor-col-resize z-50 bg-transparent hover:bg-slate-600/30 active:bg-slate-500"
+            onMouseDown={startResize}
+          />
+        )}
 
         {/* Right: Desktop Sidebar / Mobile Full View (AI Assistant or Text Editor) */}
-        <section
-          className={`h-full min-h-0 bg-slate-900 border-l border-slate-800 overflow-hidden flex flex-col ${
-            mobileTab !== 'canvas'
-              ? 'flex flex-1 w-full'
-              : 'hidden md:flex md:w-[440px] lg:md:w-[500px] xl:md:w-[540px] md:shrink-0'
-          }`}
-          style={{ height: '100%' }}
-        >
-          {/* Desktop Tab Switcher Header */}
-          <div className="hidden md:flex h-11 border-b border-slate-800 bg-slate-950/90 px-3 items-center justify-between shrink-0 select-none">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setActiveRightTab('ai')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeRightTab === 'ai'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Assistant</span>
-              </button>
+        {!rightPanelCollapsed && (
+          <section
+            className={`h-full bg-slate-900 border-l border-slate-800 overflow-hidden flex flex-col shrink-0 ${mobileTab === 'canvas' ? 'hidden md:flex' : 'flex-1 w-full'}`}
+            style={{ width: mobileTab === 'canvas' ? `${rightPanelWidth}px` : '100%', height: '100%' }}
+          >
+            {/* Desktop Tab Switcher Header */}
+            <div className="hidden md:flex h-11 border-b border-slate-800 bg-slate-950/90 px-3 items-center justify-between shrink-0 select-none">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveRightTab('ai')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeRightTab === 'ai'
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI Assistant</span>
+                </button>
 
+                <button
+                  onClick={() => setActiveRightTab('text')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeRightTab === 'text'
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <FileCode className="w-3.5 h-3.5" />
+                  <span>DSL Editor</span>
+                  {hasErrors && <span className="w-2 h-2 rounded-full bg-rose-500" />}
+                </button>
+              </div>
               <button
-                onClick={() => setActiveRightTab('text')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeRightTab === 'text'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
+                onClick={() => setRightPanelCollapsed(true)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                title="Hide Right Panel"
               >
-                <FileCode className="w-3.5 h-3.5" />
-                <span>DSL Editor</span>
-                {hasErrors && <span className="w-2 h-2 rounded-full bg-rose-500" />}
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
 
-          {/* Panel Content Container */}
-          <div className="flex-1 min-h-0 overflow-hidden relative">
-            {(mobileTab === 'ai' || (mobileTab !== 'text' && activeRightTab === 'ai')) && (
-              <AiAssistantPanel
-                onClose={() => {
-                  setMobileTab('canvas');
-                  setActiveRightTab('text');
-                }}
-              />
-            )}
-            {(mobileTab === 'text' || (mobileTab !== 'ai' && activeRightTab === 'text')) && (
-              <TextEditor />
-            )}
-          </div>
-        </section>
+            {/* Panel Content Container */}
+            <div className="flex-1 min-h-0 overflow-hidden relative">
+              {(mobileTab === 'ai' || (mobileTab !== 'text' && activeRightTab === 'ai')) && (
+                <AiAssistantPanel
+                  onClose={() => {
+                    setMobileTab('canvas');
+                    setActiveRightTab('text');
+                  }}
+                />
+              )}
+              {(mobileTab === 'text' || (mobileTab !== 'ai' && activeRightTab === 'text')) && (
+                <TextEditor />
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Right panel restore button (desktop only) */}
+        {rightPanelCollapsed && mobileTab === 'canvas' && (
+          <button
+            onClick={() => setRightPanelCollapsed(false)}
+            className="absolute top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/95 border border-slate-700 text-purple-400 text-xs font-semibold shadow-2xl backdrop-blur-md"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-medium">AI & DSL</span>
+          </button>
+        )}
       </main>
 
       {/* Mobile Sticky Bottom Tab Bar (< 768px) */}

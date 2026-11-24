@@ -18,7 +18,8 @@ export type ComponentType =
   | 'XOR'
   | 'XNOR'
   | 'D_FlipFlop'
-  | 'JK_FlipFlop';
+  | 'JK_FlipFlop'
+  | 'Clock';
 
 export type HandleOrientation = 'top' | 'bottom' | 'left' | 'right';
 
@@ -218,6 +219,19 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: 'K', label: 'K', position: 'left', aliases: ['reset', 'clr', 'k_in', '3'] },
       { id: 'Q', label: 'Q', position: 'right', aliases: ['q_out', 'out', '4'] },
       { id: 'Q_BAR', label: 'Q̄', position: 'right', aliases: ['qbar', 'not_q', 'qn', 'qb', '5'] },
+    ],
+  },
+  // -------------------------------------------------------------
+  // Clock Generators
+  // -------------------------------------------------------------
+  Clock: {
+    type: 'Clock',
+    defaultPrefix: 'CLK',
+    displayName: 'Clock Generator',
+    defaultValue: '2s',
+    category: 'logic_gates',
+    pins: [
+      { id: 'OUT', label: 'OUT', position: 'right', aliases: ['output', 'clk_out', '1'] },
     ],
   },
   // -------------------------------------------------------------
@@ -440,6 +454,11 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     jk_ff: 'JK_FlipFlop',
     jkff: 'JK_FlipFlop',
     jkflipflop: 'JK_FlipFlop',
+
+    // Clock Generators
+    clock: 'Clock',
+    clk: 'Clock',
+    clock_gen: 'Clock',
 
     // Microcontrollers & Boards
     esp32_30pin: 'ESP32_30Pin',
