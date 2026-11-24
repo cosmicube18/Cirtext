@@ -48,14 +48,16 @@ export function runCircuitSimulation(
     } else if (comp.type === 'D_FlipFlop') {
       pinStates[`${comp.id}.D`] = 0;
       pinStates[`${comp.id}.CLK`] = 0;
-      pinStates[`${comp.id}.Q`] = 0;
-      pinStates[`${comp.id}.Q_BAR`] = 1;
+      const saved = flipFlopStates[comp.id];
+      pinStates[`${comp.id}.Q`] = saved?.q ? 1 : 0;
+      pinStates[`${comp.id}.Q_BAR`] = saved?.q ? 0 : 1;
     } else if (comp.type === 'JK_FlipFlop') {
       pinStates[`${comp.id}.J`] = 0;
       pinStates[`${comp.id}.CLK`] = 0;
       pinStates[`${comp.id}.K`] = 0;
-      pinStates[`${comp.id}.Q`] = 0;
-      pinStates[`${comp.id}.Q_BAR`] = 1;
+      const saved = flipFlopStates[comp.id];
+      pinStates[`${comp.id}.Q`] = saved?.q ? 1 : 0;
+      pinStates[`${comp.id}.Q_BAR`] = saved?.q ? 0 : 1;
     }
   }
 
@@ -124,15 +126,25 @@ export function runCircuitSimulation(
       pinAdjacency[tgtPin].push(srcPin);
     }
     
-    // Add passive component internal connections (Switch.1 <-> Switch.2, Resistor.1 <-> Resistor.2)
+    // Add passive component internal connections (Resistor.1 <-> Resistor.2 always, Switch only when closed)
     for (const comp of graph.components) {
-      if (comp.type === 'Switch' || comp.type === 'Resistor') {
+      if (comp.type === 'Resistor') {
         const pin1 = `${comp.id}.1`;
         const pin2 = `${comp.id}.2`;
         if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
         if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
         pinAdjacency[pin1].push(pin2);
         pinAdjacency[pin2].push(pin1);
+      } else if (comp.type === 'Switch') {
+        const isClosed = switchStates[comp.id] ?? false;
+        if (isClosed) {
+          const pin1 = `${comp.id}.1`;
+          const pin2 = `${comp.id}.2`;
+          if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
+          if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
+          pinAdjacency[pin1].push(pin2);
+          pinAdjacency[pin2].push(pin1);
+        }
       }
     }
 
