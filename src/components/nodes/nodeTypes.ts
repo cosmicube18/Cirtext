@@ -8,6 +8,7 @@ import { SwitchNode } from './SwitchNode.tsx';
 import { Esp32Node } from './Esp32Node.tsx';
 import { MultiPinModuleNode } from './MultiPinModuleNode.tsx';
 import { OledNode } from './OledNode.tsx';
+import { LogicGateNode } from './LogicGateNode.tsx';
 
 export const circuitNodeTypes: NodeTypes = {
   // Passives & Sources
@@ -17,6 +18,15 @@ export const circuitNodeTypes: NodeTypes = {
   LED: LedNode,
   Ground: GroundNode,
   Switch: SwitchNode,
+
+  // Logic Gates
+  AND: LogicGateNode,
+  OR: LogicGateNode,
+  NOR: LogicGateNode,
+  NOT: LogicGateNode,
+  NAND: LogicGateNode,
+  XOR: LogicGateNode,
+  XNOR: LogicGateNode,
 
   // Microcontrollers
   ESP32_30Pin: Esp32Node,

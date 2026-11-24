@@ -13,6 +13,7 @@ import {
   Image,
   FileCode2,
   Loader2,
+  Zap,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 import { SAMPLE_CIRCUITS } from '../../parser/sampleCircuits.ts';
@@ -24,8 +25,17 @@ export interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt, onToggleAiPanel }) => {
-  const { graph, nodes, diagnostics, applyAutoLayout, isLayoutRunning, loadSample, clearCircuit } =
-    useCircuitStore();
+  const {
+    graph,
+    nodes,
+    diagnostics,
+    applyAutoLayout,
+    isLayoutRunning,
+    loadSample,
+    clearCircuit,
+    isSimulating,
+    toggleSimulation,
+  } = useCircuitStore();
   const [sampleMenuOpen, setSampleMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -195,6 +205,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt, onToggleAiPanel 
 
       {/* Action Toolbar */}
       <div className="flex items-center flex-wrap gap-1.5 md:gap-2">
+        {/* Real-time Simulation Toggle Button */}
+        <button
+          onClick={toggleSimulation}
+          title={isSimulating ? 'Turn off live DC/Logic simulation' : 'Turn on live DC & Logic Gate simulation'}
+          className={`flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md font-semibold text-xs transition-all shadow-sm ${
+            isSimulating
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/40'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:border-slate-600'
+          }`}
+        >
+          <Zap
+            className={`w-3.5 h-3.5 shrink-0 ${
+              isSimulating ? 'fill-amber-300 text-amber-300 animate-pulse' : 'text-slate-400'
+            }`}
+          />
+          <span className="hidden sm:inline">
+            {isSimulating ? 'Simulate: ON' : 'Simulate: OFF'}
+          </span>
+          <span className="sm:hidden text-[11px]">
+            {isSimulating ? 'Sim: ON' : 'Sim: OFF'}
+          </span>
+          {isSimulating && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
+          )}
+        </button>
+
         {/* Validate Connections Button */}
         <button
           onClick={handleValidate}

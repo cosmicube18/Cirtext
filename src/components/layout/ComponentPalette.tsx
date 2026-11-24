@@ -11,6 +11,10 @@ interface PaletteGroup {
 
 const PALETTE_GROUPS: PaletteGroup[] = [
   {
+    name: 'Logic Gates',
+    items: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'],
+  },
+  {
     name: 'Microcontrollers',
     items: ['ESP32_30Pin'],
   },

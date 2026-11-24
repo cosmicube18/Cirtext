@@ -7,6 +7,34 @@ export interface CircuitSample {
 
 export const SAMPLE_CIRCUITS: CircuitSample[] = [
   {
+    id: 'half-adder-logic',
+    name: 'Half Adder (XOR & AND Gates)',
+    description: 'Digital 1-bit binary half adder with XOR gate (Sum) and AND gate (Carry)',
+    dsl: `# Circuit: 1-Bit Half Adder
+[COMPONENTS]
+V1: VoltageSource (5V)
+SW1: Switch (Input_A)
+SW2: Switch (Input_B)
+G1: XOR (Sum)
+G2: AND (Carry)
+D1: LED (Sum_LED)
+D2: LED (Carry_LED)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> SW1.1
+V1.pos -> SW2.1
+SW1.2 -> G1.A [Label: Input_A]
+SW1.2 -> G2.A
+SW2.2 -> G1.B [Label: Input_B]
+SW2.2 -> G2.B
+G1.Y -> D1.anode [Label: Sum_Out]
+G2.Y -> D2.anode [Label: Carry_Out]
+D1.cathode -> GND.1
+D2.cathode -> GND.1
+V1.neg -> GND.1`,
+  },
+  {
     id: 'esp32-environmental-station',
     name: 'ESP32 I2C Sensor Station',
     description: 'ESP32 30-Pin dev board with SCD41, BH1750, SHT31, OLED display, and SPST switch',

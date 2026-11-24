@@ -12,6 +12,7 @@ import { parseDsl } from '../parser/dslParser.ts';
 import { serializeGraph } from '../parser/dslSerializer.ts';
 import { SAMPLE_CIRCUITS, type CircuitSample } from '../parser/sampleCircuits.ts';
 import { calculateAutoLayout } from '../utils/layout.ts';
+import { runCircuitSimulation, type SimulationResult } from '../utils/simulation.ts';
 
 export interface CircuitState {
   dslText: string;
@@ -21,6 +22,11 @@ export interface CircuitState {
   diagnostics: ParseDiagnostic[];
   lastUpdatedBy: UpdateSource;
   isLayoutRunning: boolean;
+
+  // Real-time Simulation Mode State
+  isSimulating: boolean;
+  switchStates: Record<string, boolean>; // switchId -> true (closed) / false (open)
+  simulationState: SimulationResult;
 
   // Actions
   setDslText: (text: string) => Promise<void>;
@@ -34,9 +40,17 @@ export interface CircuitState {
   applyAutoLayout: () => Promise<void>;
   loadSample: (sample: CircuitSample) => Promise<void>;
   clearCircuit: () => void;
+
+  // Simulation Actions
+  toggleSimulation: () => void;
+  toggleSwitch: (switchId: string) => void;
 }
 
-function graphToNodesAndEdges(graph: CircuitGraph): {
+function graphToNodesAndEdges(
+  graph: CircuitGraph,
+  isSimulating = false,
+  simulationResult?: SimulationResult
+): {
   nodes: CircuitNode[];
   edges: CircuitEdge[];
 } {
@@ -54,12 +68,13 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
   }));
 
   const edges: CircuitEdge[] = graph.connections.map((conn) => {
-    // Vary path offset based on source pin index so multiple wires
-    // leaving the same side of a component fan out into separate lanes.
+    // Vary path offset based on source pin index so multiple wires fan out into separate lanes.
     const sourceComp = graph.components.find((c) => c.id === conn.sourceComponentId);
     const sourceMeta = sourceComp ? COMPONENT_METADATA[sourceComp.type] : undefined;
     const sourcePinIndex = sourceMeta?.pins.findIndex((p) => p.id === conn.sourcePinId) ?? 0;
     const pinLaneOffset = Math.max(sourcePinIndex, 0) * 4;
+
+    const isLive = isSimulating && simulationResult?.edgeStates[conn.id] === 1;
 
     return {
       id: conn.id,
@@ -69,22 +84,27 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
       targetHandle: conn.targetPinId,
       type: 'smoothstep',
       label: conn.netLabel,
+      animated: isLive,
       labelStyle: conn.netLabel
-        ? { fill: '#38bdf8', fontWeight: 600, fontSize: 11 }
+        ? { fill: isLive ? '#22c55e' : '#38bdf8', fontWeight: 600, fontSize: 11 }
         : undefined,
       labelBgStyle: conn.netLabel
         ? { fill: '#0f172a', stroke: '#334155', strokeWidth: 1 }
         : undefined,
-      style: { stroke: '#38bdf8', strokeWidth: 2.2 },
+      style: isSimulating
+        ? isLive
+          ? { stroke: '#22c55e', strokeWidth: 3, filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.8))' }
+          : { stroke: '#334155', strokeWidth: 2 }
+        : { stroke: '#38bdf8', strokeWidth: 2.2 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: '#38bdf8',
+        color: isSimulating ? (isLive ? '#22c55e' : '#334155') : '#38bdf8',
         width: 14,
         height: 14,
       },
       pathOptions: {
+        offset: 24 + pinLaneOffset,
         borderRadius: 8,
-        offset: 12 + pinLaneOffset,
       },
     };
   });
@@ -93,10 +113,10 @@ function graphToNodesAndEdges(graph: CircuitGraph): {
 }
 
 // Initial default state: Voltage Divider
-const initialSample = SAMPLE_CIRCUITS[0];
+const initialSample = SAMPLE_CIRCUITS.find((s) => s.id === 'voltage-divider') || SAMPLE_CIRCUITS[0];
 const initialParse = parseDsl(initialSample.dsl);
 
-// Preset nice initial positions for Voltage Divider
+// Preset initial positions for Voltage Divider
 const INITIAL_COORDS: Record<string, { x: number; y: number }> = {
   V1: { x: 80, y: 160 },
   R1: { x: 260, y: 110 },
@@ -110,7 +130,9 @@ initialParse.graph.components.forEach((c) => {
   }
 });
 
-const initialFlow = graphToNodesAndEdges(initialParse.graph);
+const initialSwitchStates: Record<string, boolean> = { SW1: true, SW2: false };
+const initialSimResult = runCircuitSimulation(initialParse.graph, initialSwitchStates);
+const initialFlow = graphToNodesAndEdges(initialParse.graph, false, initialSimResult);
 
 export const useCircuitStore = create<CircuitState>((set, get) => ({
   dslText: initialSample.dsl,
@@ -121,6 +143,10 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   lastUpdatedBy: 'initial',
   isLayoutRunning: false,
 
+  isSimulating: false,
+  switchStates: initialSwitchStates,
+  simulationState: initialSimResult,
+
   setDslText: async (newText: string) => {
     const currentGraph = get().graph;
     const result = parseDsl(newText, currentGraph);
@@ -130,7 +156,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       (c) => c.position.x === 0 && c.position.y === 0
     );
 
-    const { nodes, edges } = graphToNodesAndEdges(result.graph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(result.graph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(result.graph, isSim, simResult);
 
     set({
       dslText: newText,
@@ -138,11 +166,11 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       diagnostics: result.diagnostics,
+      simulationState: simResult,
       lastUpdatedBy: 'text',
     });
 
-    // Auto-layout whenever newly parsed text has components lacking spatial
-    // coordinates (all at origin), so the schematic never renders overlapping.
+    // Auto-layout if freshly pasted text has all components at origin
     if (
       hasUnpositionedNodes &&
       result.graph.components.length > 0 &&
@@ -190,11 +218,16 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const newDsl = serializeGraph(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
 
     set({
-      edges: updatedEdges,
+      edges,
+      nodes,
       graph: updatedGraph,
       dslText: newDsl,
+      simulationState: simResult,
       lastUpdatedBy: 'canvas',
     });
   },
@@ -231,7 +264,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       connections: [...currentGraph.connections, newConnection],
     };
 
-    const { nodes, edges } = graphToNodesAndEdges(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
     set({
@@ -239,6 +274,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       dslText: newDsl,
+      simulationState: simResult,
       lastUpdatedBy: 'canvas',
     });
   },
@@ -248,7 +284,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     const meta = COMPONENT_METADATA[type];
     const prefix = meta.defaultPrefix;
 
-    // Find next available numeric ID e.g. R1, R2, R3
+    // Find next available numeric ID e.g. R1, R2, G1, G2
     let nextNum = 1;
     while (currentGraph.components.some((c) => c.id === `${prefix}${nextNum}`)) {
       nextNum++;
@@ -259,8 +295,8 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       : `${prefix}${nextNum}`;
 
     const defaultPos = position || {
-      x: 100 + (currentGraph.components.length % 4) * 120,
-      y: 120 + Math.floor(currentGraph.components.length / 4) * 100,
+      x: 100 + (currentGraph.components.length % 4) * 140,
+      y: 120 + Math.floor(currentGraph.components.length / 4) * 110,
     };
 
     const newComp = {
@@ -276,7 +312,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       components: [...currentGraph.components, newComp],
     };
 
-    const { nodes, edges } = graphToNodesAndEdges(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
     set({
@@ -284,6 +322,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       dslText: newDsl,
+      simulationState: simResult,
       lastUpdatedBy: 'canvas',
     });
   },
@@ -311,7 +350,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       connections: updatedConnections,
     };
 
-    const { nodes, edges } = graphToNodesAndEdges(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
     set({
@@ -319,6 +360,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       dslText: newDsl,
+      simulationState: simResult,
       lastUpdatedBy: 'canvas',
     });
   },
@@ -339,7 +381,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       connections: updatedConnections,
     };
 
-    const { nodes, edges } = graphToNodesAndEdges(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
     set({
@@ -347,6 +391,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       dslText: newDsl,
+      simulationState: simResult,
       lastUpdatedBy: 'canvas',
     });
   },
@@ -371,12 +416,15 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       components: updatedComponents,
     };
 
-    const { nodes, edges } = graphToNodesAndEdges(updatedGraph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
 
     set({
       graph: updatedGraph,
       nodes,
       edges,
+      simulationState: simResult,
       isLayoutRunning: false,
       lastUpdatedBy: 'layout',
     });
@@ -384,7 +432,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
 
   loadSample: async (sample: CircuitSample) => {
     const parseResult = parseDsl(sample.dsl);
-    const { nodes, edges } = graphToNodesAndEdges(parseResult.graph);
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(parseResult.graph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(parseResult.graph, isSim, simResult);
 
     set({
       dslText: sample.dsl,
@@ -392,6 +442,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes,
       edges,
       diagnostics: parseResult.diagnostics,
+      simulationState: simResult,
       lastUpdatedBy: 'initial',
     });
 
@@ -413,7 +464,40 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes: [],
       edges: [],
       diagnostics: [],
+      simulationState: { pinStates: {}, ledStates: {}, edgeStates: {} },
       lastUpdatedBy: 'canvas',
+    });
+  },
+
+  toggleSimulation: () => {
+    const nextSimulating = !get().isSimulating;
+    const currentGraph = get().graph;
+    const simResult = runCircuitSimulation(currentGraph, get().switchStates);
+    const { nodes, edges } = graphToNodesAndEdges(currentGraph, nextSimulating, simResult);
+
+    set({
+      isSimulating: nextSimulating,
+      simulationState: simResult,
+      nodes,
+      edges,
+    });
+  },
+
+  toggleSwitch: (switchId: string) => {
+    const nextSwitchStates = {
+      ...get().switchStates,
+      [switchId]: !get().switchStates[switchId],
+    };
+    const currentGraph = get().graph;
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(currentGraph, nextSwitchStates);
+    const { nodes, edges } = graphToNodesAndEdges(currentGraph, isSim, simResult);
+
+    set({
+      switchStates: nextSwitchStates,
+      simulationState: simResult,
+      nodes,
+      edges,
     });
   },
 }));

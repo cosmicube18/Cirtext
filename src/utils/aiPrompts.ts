@@ -17,6 +17,9 @@ Here are the strict syntax rules:
    <ID>: <Type> (<Value>)
    IMPORTANT: NEVER use empty parentheses \`()\` and NEVER put \`[Label: ...]\` on \`[COMPONENTS]\` lines. Put descriptive names inside the parentheses like \`U1: ESP32_30Pin (Controller)\` or omit parentheses completely like \`GND1: Ground\`.
    Supported Component Types and their allowed pin names:
+   - Logic Gates:
+       - NOT: input "A", output "Y" (e.g. G1: NOT)
+       - AND, OR, NOR, NAND, XOR, XNOR: inputs "A", "B", output "Y" (e.g. G1: AND, G2: OR, G3: XOR)
    - ESP32_30Pin:
        left pins: "EN", "VP", "VN", "D34", "D35", "D32", "D33", "D25", "D26", "D27", "D14", "D12", "D13", "GND", "VIN"
        right pins: "3V3", "GND" (or GND2), "D15", "D2", "D4", "RX2", "TX2", "D5", "D18", "D19", "GPIO21", "RX0", "TX0", "GPIO22", "D23"

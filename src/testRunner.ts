@@ -127,7 +127,63 @@ U1.GND -> GND1.1`;
   console.assert(result9.graph.components[0].label === 'ESP32_Controller', `Expected label ESP32_Controller, got ${result9.graph.components[0].label}`);
   console.log('✓ Test 9 Passed: Empty parentheses () and [Label: ...] on components parsed cleanly');
 
-  console.log('--- All 9 Parser, Serializer, Layout & Deletion Tests Passed! ---');
+  // Test 10: Logic Gates validation (AND, OR, NOT, NAND, NOR, XOR, XNOR)
+  const logicDsl = `# Circuit: Complete Logic Gates Demo
+[COMPONENTS]
+G1: AND
+G2: OR
+G3: NOT
+G4: NAND
+G5: NOR
+G6: XOR
+G7: XNOR
+
+[CONNECTIONS]
+G1.Y -> G2.A
+G2.Y -> G3.A
+G3.Y -> G4.A
+G4.Y -> G5.A
+G5.Y -> G6.A
+G6.Y -> G7.A`;
+  const result10 = parseDsl(logicDsl);
+  console.assert(result10.isValid, 'Expected logicDsl to be valid');
+  console.assert(result10.diagnostics.length === 0, `Expected 0 diagnostics, got ${JSON.stringify(result10.diagnostics)}`);
+  console.assert(result10.graph.components.length === 7, `Expected 7 logic gates, got ${result10.graph.components.length}`);
+  console.assert(result10.graph.connections.length === 6, `Expected 6 connections, got ${result10.graph.connections.length}`);
+
+  // Test layout dimensions for logic gates
+  const logicPositions = await calculateAutoLayout(result10.graph);
+  console.assert(Object.keys(logicPositions).length === 7, 'Expected 7 layout positions for logic gates');
+  console.log('✓ Test 10 Passed: All 7 Logic Gates (AND, OR, NOT, NAND, NOR, XOR, XNOR) parsed and layouted cleanly');
+
+  // Test 11: Real-time DC and Logic Gate Simulation Engine
+  const { runCircuitSimulation } = await import('./utils/simulation.ts');
+  const halfAdder = SAMPLE_CIRCUITS.find((s) => s.id === 'half-adder-logic')!;
+  const haResult = parseDsl(halfAdder.dsl);
+  console.assert(haResult.isValid, 'Expected half-adder circuit to be valid');
+
+  // Scenario A: SW1 = CLOSED (1), SW2 = OPEN (0)
+  // Input A = 1, Input B = 0
+  // XOR (Sum) = 1, AND (Carry) = 0, D1 (Sum LED) = Lit, D2 (Carry LED) = Off
+  const simA = runCircuitSimulation(haResult.graph, { SW1: true, SW2: false });
+  console.assert(simA.pinStates['G1.A'] === 1, `Expected G1.A to be 1, got ${simA.pinStates['G1.A']}`);
+  console.assert(simA.pinStates['G1.B'] === 0, `Expected G1.B to be 0, got ${simA.pinStates['G1.B']}`);
+  console.assert(simA.pinStates['G1.Y'] === 1, `Expected XOR Sum G1.Y to be 1, got ${simA.pinStates['G1.Y']}`);
+  console.assert(simA.pinStates['G2.Y'] === 0, `Expected AND Carry G2.Y to be 0, got ${simA.pinStates['G2.Y']}`);
+  console.assert(simA.ledStates['D1'] === true, 'Expected D1 (Sum LED) to be lit');
+  console.assert(simA.ledStates['D2'] === false, 'Expected D2 (Carry LED) to be off');
+
+  // Scenario B: SW1 = CLOSED (1), SW2 = CLOSED (1)
+  // Input A = 1, Input B = 1
+  // XOR (Sum) = 0, AND (Carry) = 1, D1 (Sum LED) = Off, D2 (Carry LED) = Lit
+  const simB = runCircuitSimulation(haResult.graph, { SW1: true, SW2: true });
+  console.assert(simB.pinStates['G1.Y'] === 0, `Expected XOR Sum G1.Y to be 0, got ${simB.pinStates['G1.Y']}`);
+  console.assert(simB.pinStates['G2.Y'] === 1, `Expected AND Carry G2.Y to be 1, got ${simB.pinStates['G2.Y']}`);
+  console.assert(simB.ledStates['D1'] === false, 'Expected D1 (Sum LED) to be off when both inputs are 1');
+  console.assert(simB.ledStates['D2'] === true, 'Expected D2 (Carry LED) to be lit when both inputs are 1');
+  console.log('✓ Test 11 Passed: Real-time DC and Logic Gate simulation correctly solved Half-Adder circuit');
+
+  console.log('--- All 11 Parser, Serializer, Layout, Gate & Simulation Tests Passed! ---');
 }
 
 runTests();

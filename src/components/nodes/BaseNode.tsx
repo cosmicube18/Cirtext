@@ -5,7 +5,7 @@ import type { PinDefinition } from '../../types/circuit.ts';
 export interface BaseNodeProps {
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   selected?: boolean;
   pins: PinDefinition[];
   children: React.ReactNode;
@@ -39,9 +39,13 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
           {title}
         </span>
         {subtitle && (
-          <span className="font-mono text-[11px] text-amber-300/90 font-medium px-1.5 py-0.2 rounded bg-amber-950/40 border border-amber-800/40">
-            {subtitle}
-          </span>
+          typeof subtitle === 'string' ? (
+            <span className="font-mono text-[11px] text-amber-300/90 font-medium px-1.5 py-0.2 rounded bg-amber-950/40 border border-amber-800/40">
+              {subtitle}
+            </span>
+          ) : (
+            subtitle
+          )
         )}
       </div>
 

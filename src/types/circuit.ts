@@ -4,17 +4,24 @@ export type ComponentType =
   | 'Capacitor'
   | 'LED'
   | 'Ground'
+  | 'Switch'
   | 'ESP32_30Pin'
   | 'SCD41'
   | 'BH1750'
   | 'SHT31'
   | 'OLED_SSD1306'
-  | 'Switch';
+  | 'AND'
+  | 'OR'
+  | 'NOR'
+  | 'NOT'
+  | 'NAND'
+  | 'XOR'
+  | 'XNOR';
 
 export type HandleOrientation = 'top' | 'bottom' | 'left' | 'right';
 
 export interface PinDefinition {
-  id: string; // e.g. '1', '2', 'pos', 'neg', 'GPIO21', 'SDA', etc.
+  id: string; // e.g. '1', '2', 'pos', 'neg', 'A', 'B', 'Y', 'GPIO21', 'SDA', etc.
   label: string;
   position: HandleOrientation;
   offset?: { x: number; y: number };
@@ -26,7 +33,7 @@ export interface ComponentMetadata {
   defaultPrefix: string;
   displayName: string;
   defaultValue?: string;
-  category?: 'passives' | 'microcontrollers' | 'sensors_displays';
+  category?: 'passives' | 'microcontrollers' | 'sensors_displays' | 'logic_gates';
   pins: PinDefinition[];
 }
 
@@ -95,6 +102,95 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: '2', label: '2', position: 'right', aliases: ['out', 'b'] },
     ],
   },
+  // -------------------------------------------------------------
+  // Logic Gates (IEEE Standard)
+  // -------------------------------------------------------------
+  AND: {
+    type: 'AND',
+    defaultPrefix: 'G',
+    displayName: 'AND Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  OR: {
+    type: 'OR',
+    defaultPrefix: 'G',
+    displayName: 'OR Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  NOT: {
+    type: 'NOT',
+    defaultPrefix: 'G',
+    displayName: 'NOT Gate',
+    defaultValue: 'Inverter',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['in', '1'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '2'] },
+    ],
+  },
+  NAND: {
+    type: 'NAND',
+    defaultPrefix: 'G',
+    displayName: 'NAND Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  NOR: {
+    type: 'NOR',
+    defaultPrefix: 'G',
+    displayName: 'NOR Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  XOR: {
+    type: 'XOR',
+    defaultPrefix: 'G',
+    displayName: 'XOR Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  XNOR: {
+    type: 'XNOR',
+    defaultPrefix: 'G',
+    displayName: 'XNOR Gate',
+    defaultValue: '2-Input',
+    category: 'logic_gates',
+    pins: [
+      { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
+      { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
+      { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  // -------------------------------------------------------------
+  // Microcontrollers & Dev Boards
+  // -------------------------------------------------------------
   ESP32_30Pin: {
     type: 'ESP32_30Pin',
     defaultPrefix: 'U',
@@ -137,6 +233,9 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: 'D23', label: 'D23', position: 'right', aliases: ['gpio23', '23', 'mosi'] },
     ],
   },
+  // -------------------------------------------------------------
+  // Sensors & Displays
+  // -------------------------------------------------------------
   SCD41: {
     type: 'SCD41',
     defaultPrefix: 'U',
@@ -194,7 +293,7 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
 };
 
 export interface CircuitComponent {
-  id: string; // e.g. "V1", "R1", "GND", "U1"
+  id: string; // e.g. "V1", "R1", "GND", "U1", "G1"
   type: ComponentType;
   value?: string;
   label?: string;
@@ -282,12 +381,32 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     sw: 'Switch',
     spst: 'Switch',
 
+    // Logic Gates
+    and: 'AND',
+    andgate: 'AND',
+    or: 'OR',
+    orgate: 'OR',
+    not: 'NOT',
+    notgate: 'NOT',
+    inverter: 'NOT',
+    inv: 'NOT',
+    nand: 'NAND',
+    nandgate: 'NAND',
+    nor: 'NOR',
+    norgate: 'NOR',
+    xor: 'XOR',
+    xorgate: 'XOR',
+    xnor: 'XNOR',
+    xnorgate: 'XNOR',
+
+    // Microcontrollers & Boards
     esp32_30pin: 'ESP32_30Pin',
     esp32: 'ESP32_30Pin',
     esp3230pin: 'ESP32_30Pin',
     esp: 'ESP32_30Pin',
     nodemcu: 'ESP32_30Pin',
 
+    // Sensors & Displays
     scd41: 'SCD41',
     scd_41: 'SCD41',
 

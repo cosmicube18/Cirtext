@@ -34,6 +34,14 @@ export async function calculateAutoLayout(
       case 'BH1750':
       case 'SHT31':
         return { width: 240, height: 200 };
+      case 'AND':
+      case 'OR':
+      case 'NOR':
+      case 'NOT':
+      case 'NAND':
+      case 'XOR':
+      case 'XNOR':
+        return { width: 160, height: 110 };
       case 'VoltageSource':
       case 'Resistor':
       case 'Capacitor':
@@ -49,15 +57,42 @@ export async function calculateAutoLayout(
   const elkChildren = graph.components.map((comp) => {
     const dims = getComponentDimensions(comp.type);
     const meta = COMPONENT_METADATA[comp.type as ComponentType];
-    const ports = meta?.pins.map((pin) => ({
-      id: pin.id,
-      width: 4,
-      height: 4,
-      layoutOptions: {
-        'elk.portConstraints': 'FIXED_SIDE',
-        'elk.port.side': PIN_SIDE_TO_ELK[pin.position],
-      },
-    })) || [];
+    const ports =
+      meta?.pins.map((pin) => ({
+        id: `${comp.id}_${pin.id}`,
+        width: 4,
+        height: 4,
+        layoutOptions: {
+          'elk.portConstraints': 'FIXED_SIDE',
+          'elk.port.side': PIN_SIDE_TO_ELK[pin.position] || 'EAST',
+        },
+      })) || [];
+
+    // Ensure any connected pin that wasn't in metadata is also present as a port
+    graph.connections.forEach((conn) => {
+      if (
+        conn.sourceComponentId === comp.id &&
+        !ports.some((p) => p.id === `${comp.id}_${conn.sourcePinId}`)
+      ) {
+        ports.push({
+          id: `${comp.id}_${conn.sourcePinId}`,
+          width: 4,
+          height: 4,
+          layoutOptions: { 'elk.portConstraints': 'FIXED_SIDE', 'elk.port.side': 'EAST' },
+        });
+      }
+      if (
+        conn.targetComponentId === comp.id &&
+        !ports.some((p) => p.id === `${comp.id}_${conn.targetPinId}`)
+      ) {
+        ports.push({
+          id: `${comp.id}_${conn.targetPinId}`,
+          width: 4,
+          height: 4,
+          layoutOptions: { 'elk.portConstraints': 'FIXED_SIDE', 'elk.port.side': 'WEST' },
+        });
+      }
+    });
 
     return {
       id: comp.id,
@@ -67,12 +102,10 @@ export async function calculateAutoLayout(
     };
   });
 
-  const elkEdges = graph.connections.map((conn) => ({
-    id: `elk_edge_${conn.sourceComponentId}_${conn.sourcePinId}_${conn.targetComponentId}_${conn.targetPinId}`,
-    source: conn.sourceComponentId,
-    sourcePort: conn.sourcePinId,
-    target: conn.targetComponentId,
-    targetPort: conn.targetPinId,
+  const elkEdges = graph.connections.map((conn, idx) => ({
+    id: `elk_edge_${idx}_${conn.sourceComponentId}_${conn.sourcePinId}_${conn.targetComponentId}_${conn.targetPinId}`,
+    sources: [`${conn.sourceComponentId}_${conn.sourcePinId}`],
+    targets: [`${conn.targetComponentId}_${conn.targetPinId}`],
   }));
 
   const rootNode: ElkNode = {
