@@ -42,6 +42,9 @@ export async function calculateAutoLayout(
       case 'XOR':
       case 'XNOR':
         return { width: 160, height: 110 };
+      case 'D_FlipFlop':
+      case 'JK_FlipFlop':
+        return { width: 180, height: 150 };
       case 'VoltageSource':
       case 'Resistor':
       case 'Capacitor':

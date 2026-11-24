@@ -15,6 +15,10 @@ const PALETTE_GROUPS: PaletteGroup[] = [
     items: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'],
   },
   {
+    name: 'Sequential Logic',
+    items: ['D_FlipFlop', 'JK_FlipFlop'],
+  },
+  {
     name: 'Microcontrollers',
     items: ['ESP32_30Pin'],
   },

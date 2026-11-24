@@ -1,10 +1,18 @@
 import type { CircuitGraph } from '../types/circuit.ts';
 
+export interface FlipFlopState {
+  q: boolean;
+  prevClk: boolean;
+}
+
+export type FlipFlopStates = Record<string, FlipFlopState>;
+
 export interface SimulationResult {
-  pinStates: Record<string, 0 | 1>; // `${componentId}.${pinId}` -> 1 = HIGH, 0 = LOW / unenergized
-  isGrounded: Record<string, boolean>; // `${componentId}.${pinId}` -> true ONLY if path to Ground.1 or VoltageSource.neg exists
-  ledStates: Record<string, boolean>; // `${componentId}` -> boolean (true = lit in closed loop)
-  edgeStates: Record<string, 0 | 1>; // `${edgeId}` -> 0 or 1 (1 = energized/live)
+  pinStates: Record<string, 0 | 1>;
+  isGrounded: Record<string, boolean>;
+  ledStates: Record<string, boolean>;
+  edgeStates: Record<string, 0 | 1>;
+  flipFlopStates: FlipFlopStates;
 }
 
 /**
@@ -16,7 +24,8 @@ export interface SimulationResult {
  */
 export function runCircuitSimulation(
   graph: CircuitGraph,
-  switchStates: Record<string, boolean>
+  switchStates: Record<string, boolean>,
+  flipFlopStates: FlipFlopStates = {}
 ): SimulationResult {
   const pinStates: Record<string, 0 | 1> = {};
   const isGrounded: Record<string, boolean> = {};
@@ -36,6 +45,17 @@ export function runCircuitSimulation(
         pinStates[`${comp.id}.B`] = 0;
       }
       pinStates[`${comp.id}.Y`] = 0;
+    } else if (comp.type === 'D_FlipFlop') {
+      pinStates[`${comp.id}.D`] = 0;
+      pinStates[`${comp.id}.CLK`] = 0;
+      pinStates[`${comp.id}.Q`] = 0;
+      pinStates[`${comp.id}.Q_BAR`] = 1;
+    } else if (comp.type === 'JK_FlipFlop') {
+      pinStates[`${comp.id}.J`] = 0;
+      pinStates[`${comp.id}.CLK`] = 0;
+      pinStates[`${comp.id}.K`] = 0;
+      pinStates[`${comp.id}.Q`] = 0;
+      pinStates[`${comp.id}.Q_BAR`] = 1;
     }
   }
 
@@ -95,8 +115,19 @@ export function runCircuitSimulation(
       const srcPin = `${conn.sourceComponentId}.${conn.sourcePinId}`;
       const tgtPin = `${conn.targetComponentId}.${conn.targetPinId}`;
 
-      // Forward signal propagation
-      if (pinStates[srcPin] === 1 && pinStates[tgtPin] !== 1) {
+      // Forward signal propagation: driver outputs (Logic Gates Y, Flip-Flop Q/Q_BAR) actively drive target pins
+      const isDriverOutput =
+        conn.sourcePinId === 'Y' ||
+        conn.sourcePinId === 'Q' ||
+        conn.sourcePinId === 'Q_BAR';
+
+      if (isDriverOutput) {
+        const driverVal = pinStates[srcPin] ?? 0;
+        if (pinStates[tgtPin] !== driverVal) {
+          pinStates[tgtPin] = driverVal;
+          changed = true;
+        }
+      } else if (pinStates[srcPin] === 1 && pinStates[tgtPin] !== 1) {
         pinStates[tgtPin] = 1;
         changed = true;
       }
@@ -181,6 +212,57 @@ export function runCircuitSimulation(
           changed = true;
         }
       }
+
+      // Sequential Logic Evaluation (D_FlipFlop, JK_FlipFlop) with rising-edge detection
+      if (comp.type === 'D_FlipFlop' || comp.type === 'JK_FlipFlop') {
+        const compId = comp.id;
+        const currClk = (pinStates[`${compId}.CLK`] ?? 0) === 1;
+
+        // Initialize or retrieve flip-flop state
+        if (!flipFlopStates[compId]) {
+          flipFlopStates[compId] = { q: false, prevClk: false };
+        }
+        const ffState = flipFlopStates[compId];
+
+        // Rising edge detection: CLK went from LOW to HIGH
+        const risingEdge = !ffState.prevClk && currClk;
+
+        if (risingEdge) {
+          if (comp.type === 'D_FlipFlop') {
+            const inD = pinStates[`${compId}.D`] ?? 0;
+            ffState.q = inD === 1;
+          } else if (comp.type === 'JK_FlipFlop') {
+            const inJ = pinStates[`${compId}.J`] ?? 0;
+            const inK = pinStates[`${compId}.K`] ?? 0;
+
+            if (inJ === 0 && inK === 0) {
+              // Hold: q stays the same
+            } else if (inJ === 0 && inK === 1) {
+              ffState.q = false; // Reset
+            } else if (inJ === 1 && inK === 0) {
+              ffState.q = true; // Set
+            } else if (inJ === 1 && inK === 1) {
+              ffState.q = !ffState.q; // Toggle
+            }
+          }
+        }
+
+        // Always update prevClk for next evaluation
+        ffState.prevClk = currClk;
+
+        // Drive outputs
+        const outQ: 0 | 1 = ffState.q ? 1 : 0;
+        const outQBar: 0 | 1 = ffState.q ? 0 : 1;
+
+        if (pinStates[`${compId}.Q`] !== outQ) {
+          pinStates[`${compId}.Q`] = outQ;
+          changed = true;
+        }
+        if (pinStates[`${compId}.Q_BAR`] !== outQBar) {
+          pinStates[`${compId}.Q_BAR`] = outQBar;
+          changed = true;
+        }
+      }
     }
 
     if (!changed) break;
@@ -211,5 +293,6 @@ export function runCircuitSimulation(
     isGrounded,
     ledStates,
     edgeStates,
+    flipFlopStates,
   };
 }

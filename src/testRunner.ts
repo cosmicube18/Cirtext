@@ -228,7 +228,57 @@ D1.cathode -> V1.neg`;
 
   console.log('✓ Test 12 Passed: Closed-loop ground check verified (floating cathode prevents illumination; ground completes circuit)');
 
-  console.log('--- All 12 Parser, Serializer, Layout, Gate & Closed-Loop Simulation Tests Passed! ---');
+  // Test 13: Sequential Logic (D_FlipFlop and JK_FlipFlop)
+  const flipFlopDsl = `# Circuit: Sequential Flip-Flop Register
+[COMPONENTS]
+V1: VoltageSource (5V)
+SW_D: Switch (Data)
+SW_CLK: Switch (Clock)
+FF1: D_FlipFlop (Register_D)
+FF2: JK_FlipFlop (Register_JK)
+D_Out: LED (Q_Out)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> SW_D.1
+V1.pos -> SW_CLK.1
+SW_D.2 -> FF1.D
+SW_CLK.2 -> FF1.CLK
+FF1.Q -> FF2.J
+FF1.Q_BAR -> FF2.K
+SW_CLK.2 -> FF2.CLK
+FF2.Q -> D_Out.anode
+D_Out.cathode -> GND.1
+V1.neg -> GND.1`;
+
+  const ffResult = parseDsl(flipFlopDsl);
+  console.assert(ffResult.isValid, 'Expected flipFlopDsl to be valid');
+  console.assert(ffResult.diagnostics.length === 0, `Expected 0 diagnostics, got ${JSON.stringify(ffResult.diagnostics)}`);
+  console.assert(ffResult.graph.components.length === 7, `Expected 7 components, got ${ffResult.graph.components.length}`);
+
+  // Test layout computation for flip-flops
+  const ffPositions = await calculateAutoLayout(ffResult.graph);
+  console.assert(Boolean(ffPositions['FF1'] && ffPositions['FF2']), 'Expected layout positions for FF1 and FF2');
+
+  // Simulation: When CLK is OPEN (0), FF1 holds initial state (Q=0, Q_BAR=1)
+  const simClkLow = runCircuitSimulation(ffResult.graph, { SW_D: true, SW_CLK: false });
+  console.assert(simClkLow.pinStates['FF1.D'] === 1, 'Expected FF1.D to be 1');
+  console.assert(simClkLow.pinStates['FF1.CLK'] === 0, 'Expected FF1.CLK to be 0');
+  console.assert(simClkLow.pinStates['FF1.Q'] === 0, 'Expected FF1.Q to remain 0 before clock pulse');
+  console.assert(simClkLow.pinStates['FF1.Q_BAR'] === 1, 'Expected FF1.Q_BAR to be 1');
+
+  // Simulation: When CLK is CLOSED (1), FF1 latches D (Q=1, Q_BAR=0), FF2 receives J=1, K=0 -> Sets FF2.Q=1, lighting LED!
+  const simClkHigh = runCircuitSimulation(ffResult.graph, { SW_D: true, SW_CLK: true });
+  console.assert(simClkHigh.pinStates['FF1.Q'] === 1, 'Expected FF1.Q to be latched to 1 on clock pulse');
+  console.assert(simClkHigh.pinStates['FF1.Q_BAR'] === 0, 'Expected FF1.Q_BAR to be 0');
+  console.assert(simClkHigh.pinStates['FF2.J'] === 1, 'Expected FF2.J to be 1');
+  console.assert(simClkHigh.pinStates['FF2.K'] === 0, 'Expected FF2.K to be 0');
+  console.assert(simClkHigh.pinStates['FF2.Q'] === 1, 'Expected FF2.Q to be Set to 1');
+  console.assert(simClkHigh.ledStates['D_Out'] === true, 'Expected D_Out LED to be lit');
+
+  console.log('✓ Test 13 Passed: Sequential Logic (D_FlipFlop & JK_FlipFlop) parsed, layouted, and simulated cleanly');
+
+  console.log('--- All 13 Parser, Serializer, Layout, Gate, Closed-Loop & Sequential Tests Passed! ---');
 }
 
 runTests();

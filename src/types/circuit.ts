@@ -16,7 +16,9 @@ export type ComponentType =
   | 'NOT'
   | 'NAND'
   | 'XOR'
-  | 'XNOR';
+  | 'XNOR'
+  | 'D_FlipFlop'
+  | 'JK_FlipFlop';
 
 export type HandleOrientation = 'top' | 'bottom' | 'left' | 'right';
 
@@ -186,6 +188,36 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: 'A', label: 'A', position: 'left', aliases: ['1', 'in1', 'ina'] },
       { id: 'B', label: 'B', position: 'left', aliases: ['2', 'in2', 'inb'] },
       { id: 'Y', label: 'Y', position: 'right', aliases: ['out', 'q', '3'] },
+    ],
+  },
+  // -------------------------------------------------------------
+  // Sequential Logic (Flip-Flops)
+  // -------------------------------------------------------------
+  D_FlipFlop: {
+    type: 'D_FlipFlop',
+    defaultPrefix: 'FF',
+    displayName: 'D Flip-Flop',
+    defaultValue: 'D-FF',
+    category: 'logic_gates',
+    pins: [
+      { id: 'D', label: 'D', position: 'left', aliases: ['data', 'din', '1'] },
+      { id: 'CLK', label: 'CLK', position: 'left', aliases: ['clock', 'cp', '>', 'clk_in', '2'] },
+      { id: 'Q', label: 'Q', position: 'right', aliases: ['q_out', 'out', '3'] },
+      { id: 'Q_BAR', label: 'Q̄', position: 'right', aliases: ['qbar', 'not_q', 'qn', 'qb', '4'] },
+    ],
+  },
+  JK_FlipFlop: {
+    type: 'JK_FlipFlop',
+    defaultPrefix: 'FF',
+    displayName: 'JK Flip-Flop',
+    defaultValue: 'JK-FF',
+    category: 'logic_gates',
+    pins: [
+      { id: 'J', label: 'J', position: 'left', aliases: ['set', 'j_in', '1'] },
+      { id: 'CLK', label: 'CLK', position: 'left', aliases: ['clock', 'cp', '>', 'clk_in', '2'] },
+      { id: 'K', label: 'K', position: 'left', aliases: ['reset', 'clr', 'k_in', '3'] },
+      { id: 'Q', label: 'Q', position: 'right', aliases: ['q_out', 'out', '4'] },
+      { id: 'Q_BAR', label: 'Q̄', position: 'right', aliases: ['qbar', 'not_q', 'qn', 'qb', '5'] },
     ],
   },
   // -------------------------------------------------------------
@@ -398,6 +430,16 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     xorgate: 'XOR',
     xnor: 'XNOR',
     xnorgate: 'XNOR',
+
+    // Sequential Logic (Flip-Flops)
+    d_flipflop: 'D_FlipFlop',
+    d_ff: 'D_FlipFlop',
+    dff: 'D_FlipFlop',
+    dflipflop: 'D_FlipFlop',
+    jk_flipflop: 'JK_FlipFlop',
+    jk_ff: 'JK_FlipFlop',
+    jkff: 'JK_FlipFlop',
+    jkflipflop: 'JK_FlipFlop',
 
     // Microcontrollers & Boards
     esp32_30pin: 'ESP32_30Pin',

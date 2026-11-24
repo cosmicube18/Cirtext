@@ -9,6 +9,7 @@ import { Esp32Node } from './Esp32Node.tsx';
 import { MultiPinModuleNode } from './MultiPinModuleNode.tsx';
 import { OledNode } from './OledNode.tsx';
 import { LogicGateNode } from './LogicGateNode.tsx';
+import { FlipFlopNode } from './FlipFlopNode.tsx';
 
 export const circuitNodeTypes: NodeTypes = {
   // Passives & Sources
@@ -27,6 +28,10 @@ export const circuitNodeTypes: NodeTypes = {
   NAND: LogicGateNode,
   XOR: LogicGateNode,
   XNOR: LogicGateNode,
+
+  // Sequential Logic (Flip-Flops)
+  D_FlipFlop: FlipFlopNode,
+  JK_FlipFlop: FlipFlopNode,
 
   // Microcontrollers
   ESP32_30Pin: Esp32Node,
