@@ -1,31 +1,35 @@
 import type { CircuitGraph } from '../types/circuit.ts';
 
 export interface SimulationResult {
-  pinStates: Record<string, 0 | 1>; // `${componentId}.${pinId}` -> 0 or 1
-  ledStates: Record<string, boolean>; // `${componentId}` -> boolean (true = lit)
-  edgeStates: Record<string, 0 | 1>; // `${edgeId}` -> 0 or 1
+  pinStates: Record<string, 0 | 1>; // `${componentId}.${pinId}` -> 1 = HIGH, 0 = LOW / unenergized
+  isGrounded: Record<string, boolean>; // `${componentId}.${pinId}` -> true ONLY if path to Ground.1 or VoltageSource.neg exists
+  ledStates: Record<string, boolean>; // `${componentId}` -> boolean (true = lit in closed loop)
+  edgeStates: Record<string, 0 | 1>; // `${edgeId}` -> 0 or 1 (1 = energized/live)
 }
 
 /**
  * Solves DC logic propagation and digital gate evaluation across the circuit graph.
- * Supports VoltageSources, Grounds, Switches, Resistors, Capacitors, Logic Gates, and LEDs.
+ * Enforces a closed-loop ground check:
+ * - Net/pins are only marked as `isGrounded` if they have a conductive return path to
+ *   a `Ground` component's pin `1` OR a `VoltageSource` component's `neg` pin.
+ * - An `LED` ONLY lights up when its `anode` is HIGH (1) AND its `cathode` is GROUNDED.
  */
 export function runCircuitSimulation(
   graph: CircuitGraph,
   switchStates: Record<string, boolean>
 ): SimulationResult {
   const pinStates: Record<string, 0 | 1> = {};
-  const gndReachable = new Set<string>();
+  const isGrounded: Record<string, boolean> = {};
 
-  // 1. Initialize fixed power sources and default logic gate pins
+  // 1. Initialize fixed power sources, explicit ground nets, and default logic gate pins
   for (const comp of graph.components) {
     if (comp.type === 'VoltageSource') {
       pinStates[`${comp.id}.pos`] = 1;
       pinStates[`${comp.id}.neg`] = 0;
-      gndReachable.add(`${comp.id}.neg`);
+      isGrounded[`${comp.id}.neg`] = true;
     } else if (comp.type === 'Ground') {
       pinStates[`${comp.id}.1`] = 0;
-      gndReachable.add(`${comp.id}.1`);
+      isGrounded[`${comp.id}.1`] = true;
     } else if (['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'].includes(comp.type)) {
       pinStates[`${comp.id}.A`] = 0;
       if (comp.type !== 'NOT') {
@@ -40,51 +44,48 @@ export function runCircuitSimulation(
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let changed = false;
 
-    // A. Propagate through passive conductive components (Switch, Resistor, Capacitor)
+    // A. Propagate through passive conductive components (Switch, Resistor)
     for (const comp of graph.components) {
       if (comp.type === 'Switch') {
         const isClosed = switchStates[comp.id] ?? false;
         if (isClosed) {
           const pin1 = `${comp.id}.1`;
           const pin2 = `${comp.id}.2`;
-          // Signal bridging
+
+          // Bidirectional signal bridging
           if ((pinStates[pin1] === 1 || pinStates[pin2] === 1) && (!pinStates[pin1] || !pinStates[pin2])) {
             pinStates[pin1] = 1;
             pinStates[pin2] = 1;
             changed = true;
           }
-          // Ground bridging
-          if (gndReachable.has(pin1) && !gndReachable.has(pin2)) {
-            gndReachable.add(pin2);
+
+          // Bidirectional ground bridging
+          if (isGrounded[pin1] && !isGrounded[pin2]) {
+            isGrounded[pin2] = true;
             changed = true;
-          } else if (gndReachable.has(pin2) && !gndReachable.has(pin1)) {
-            gndReachable.add(pin1);
+          } else if (isGrounded[pin2] && !isGrounded[pin1]) {
+            isGrounded[pin1] = true;
             changed = true;
           }
         }
-      } else if (comp.type === 'Resistor' || comp.type === 'Capacitor') {
+      } else if (comp.type === 'Resistor') {
         const pin1 = `${comp.id}.1`;
         const pin2 = `${comp.id}.2`;
-        // Signal bridging
+
+        // Bidirectional signal bridging
         if ((pinStates[pin1] === 1 || pinStates[pin2] === 1) && (!pinStates[pin1] || !pinStates[pin2])) {
           pinStates[pin1] = 1;
           pinStates[pin2] = 1;
           changed = true;
         }
-        // Ground bridging
-        if (gndReachable.has(pin1) && !gndReachable.has(pin2)) {
-          gndReachable.add(pin2);
+
+        // Bidirectional ground bridging through current-limiting resistor
+        if (isGrounded[pin1] && !isGrounded[pin2]) {
+          isGrounded[pin2] = true;
           changed = true;
-        } else if (gndReachable.has(pin2) && !gndReachable.has(pin1)) {
-          gndReachable.add(pin1);
+        } else if (isGrounded[pin2] && !isGrounded[pin1]) {
+          isGrounded[pin1] = true;
           changed = true;
-        }
-      } else if (comp.type === 'LED') {
-        // Reverse ground path through LED cathode
-        const cathode = `${comp.id}.cathode`;
-        const anode = `${comp.id}.anode`;
-        if (gndReachable.has(cathode) && !gndReachable.has(anode)) {
-          // Cathode connects to ground
         }
       }
     }
@@ -102,8 +103,10 @@ export function runCircuitSimulation(
 
       // Reverse signal propagation for bidirectional elements
       const targetComp = graph.components.find((c) => c.id === conn.targetComponentId);
+      const sourceComp = graph.components.find((c) => c.id === conn.sourceComponentId);
+
       if (
-        (targetComp?.type === 'Resistor' || targetComp?.type === 'Switch' || targetComp?.type === 'Capacitor') &&
+        (targetComp?.type === 'Resistor' || targetComp?.type === 'Switch') &&
         pinStates[tgtPin] === 1 &&
         pinStates[srcPin] !== 1
       ) {
@@ -111,13 +114,22 @@ export function runCircuitSimulation(
         changed = true;
       }
 
-      // Bidirectional ground reachability
-      if (gndReachable.has(srcPin) && !gndReachable.has(tgtPin)) {
-        gndReachable.add(tgtPin);
+      if (
+        (sourceComp?.type === 'Resistor' || sourceComp?.type === 'Switch') &&
+        pinStates[tgtPin] === 1 &&
+        pinStates[srcPin] !== 1
+      ) {
+        pinStates[srcPin] = 1;
         changed = true;
       }
-      if (gndReachable.has(tgtPin) && !gndReachable.has(srcPin)) {
-        gndReachable.add(srcPin);
+
+      // Bidirectional ground reachability across wires
+      if (isGrounded[srcPin] && !isGrounded[tgtPin]) {
+        isGrounded[tgtPin] = true;
+        changed = true;
+      }
+      if (isGrounded[tgtPin] && !isGrounded[srcPin]) {
+        isGrounded[srcPin] = true;
         changed = true;
       }
     }
@@ -174,14 +186,14 @@ export function runCircuitSimulation(
     if (!changed) break;
   }
 
-  // 3. Evaluate LED illumination state
-  // LED turns on when anode is HIGH (1) AND cathode has a conductive path to Ground
+  // 3. Evaluate LED illumination state:
+  // An LED ONLY lights up when anode is HIGH (1) AND cathode is GROUNDED (closed return path)
   const ledStates: Record<string, boolean> = {};
   for (const comp of graph.components) {
     if (comp.type === 'LED') {
       const anodeHigh = pinStates[`${comp.id}.anode`] === 1;
-      const cathodeGround = gndReachable.has(`${comp.id}.cathode`);
-      ledStates[comp.id] = anodeHigh && cathodeGround;
+      const cathodeGrounded = Boolean(isGrounded[`${comp.id}.cathode`]);
+      ledStates[comp.id] = anodeHigh && cathodeGrounded;
     }
   }
 
@@ -196,6 +208,7 @@ export function runCircuitSimulation(
 
   return {
     pinStates,
+    isGrounded,
     ledStates,
     edgeStates,
   };

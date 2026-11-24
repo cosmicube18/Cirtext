@@ -183,7 +183,52 @@ G6.Y -> G7.A`;
   console.assert(simB.ledStates['D2'] === true, 'Expected D2 (Carry LED) to be lit when both inputs are 1');
   console.log('✓ Test 11 Passed: Real-time DC and Logic Gate simulation correctly solved Half-Adder circuit');
 
-  console.log('--- All 11 Parser, Serializer, Layout, Gate & Simulation Tests Passed! ---');
+  // Test 12: Enforce Closed-Loop Ground Check (LED only lights if cathode has return path to Ground)
+  const openLoopDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+D1: LED (Red)
+SW1: Switch (Gnd_Switch)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> D1.anode
+D1.cathode -> SW1.1
+SW1.2 -> GND.1
+V1.neg -> GND.1`;
+
+  const openLoopGraph = parseDsl(openLoopDsl).graph;
+
+  // Scenario 1: SW1 is OPEN (ground return broken)
+  // Anode is HIGH (1), but Cathode is FLOATING (not grounded) -> LED must NOT light up!
+  const simOpen = runCircuitSimulation(openLoopGraph, { SW1: false });
+  console.assert(simOpen.pinStates['D1.anode'] === 1, 'Expected D1.anode to be HIGH');
+  console.assert(!simOpen.isGrounded['D1.cathode'], 'Expected D1.cathode to be ungrounded when switch is open');
+  console.assert(simOpen.ledStates['D1'] === false, 'Expected D1 to be OFF when cathode is floating');
+
+  // Scenario 2: SW1 is CLOSED (ground return complete)
+  // Cathode is GROUNDED through closed switch -> LED lights up!
+  const simClosed = runCircuitSimulation(openLoopGraph, { SW1: true });
+  console.assert(simClosed.isGrounded['D1.cathode'] === true, 'Expected D1.cathode to be grounded when switch is closed');
+  console.assert(simClosed.ledStates['D1'] === true, 'Expected D1 to be ON when closed loop to ground is complete');
+
+  // Scenario 3: Return directly to VoltageSource.neg without separate Ground node
+  const directReturnDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+D1: LED (Red)
+
+[CONNECTIONS]
+V1.pos -> D1.anode
+D1.cathode -> V1.neg`;
+
+  const directReturnGraph = parseDsl(directReturnDsl).graph;
+  const simDirect = runCircuitSimulation(directReturnGraph, {});
+  console.assert(simDirect.isGrounded['V1.neg'] === true, 'Expected V1.neg to be grounded');
+  console.assert(simDirect.isGrounded['D1.cathode'] === true, 'Expected D1.cathode to be grounded via V1.neg');
+  console.assert(simDirect.ledStates['D1'] === true, 'Expected D1 to be ON with direct return to V1.neg');
+
+  console.log('✓ Test 12 Passed: Closed-loop ground check verified (floating cathode prevents illumination; ground completes circuit)');
+
+  console.log('--- All 12 Parser, Serializer, Layout, Gate & Closed-Loop Simulation Tests Passed! ---');
 }
 
 runTests();

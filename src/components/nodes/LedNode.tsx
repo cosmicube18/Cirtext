@@ -5,11 +5,24 @@ import type { CircuitNodeData } from '../../types/flow.ts';
 import { COMPONENT_METADATA } from '../../types/circuit.ts';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 
+/**
+ * Interactive LED Schematic Node with Closed-Loop Ground Verification:
+ * An LED ONLY illuminates when its anode receives HIGH (1) AND its cathode has
+ * a verified return path to Ground or VoltageSource.neg (isGrounded).
+ */
 export const LedNode: React.FC<NodeProps> = (props) => {
   const data = props.data as unknown as CircuitNodeData;
   const pins = COMPONENT_METADATA.LED.pins;
   const isSimulating = useCircuitStore((s) => s.isSimulating);
-  const isLit = useCircuitStore((s) => s.isSimulating && Boolean(s.simulationState.ledStates[props.id]));
+  const isAnodeHigh = useCircuitStore(
+    (s) => s.isSimulating && s.simulationState.pinStates[`${props.id}.anode`] === 1
+  );
+  const isCathodeGrounded = useCircuitStore(
+    (s) => s.isSimulating && Boolean(s.simulationState.isGrounded?.[`${props.id}.cathode`])
+  );
+  const isLit = useCircuitStore(
+    (s) => s.isSimulating && Boolean(s.simulationState.ledStates[props.id]) && isCathodeGrounded
+  );
 
   return (
     <BaseNode
@@ -17,15 +30,28 @@ export const LedNode: React.FC<NodeProps> = (props) => {
       title={data.id || props.id}
       subtitle={
         isSimulating ? (
-          <span
-            className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border transition-all select-none ${
-              isLit
-                ? 'bg-rose-950/80 text-rose-300 border-rose-500/80 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-          >
-            {isLit ? 'ON' : 'OFF'}
-          </span>
+          isLit ? (
+            <span
+              className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/80 text-rose-300 border-rose-500/80 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse select-none"
+              title="Illuminated: Closed loop active (Anode=HIGH, Cathode=GROUNDED)"
+            >
+              ON
+            </span>
+          ) : isAnodeHigh && !isCathodeGrounded ? (
+            <span
+              className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/80 text-amber-300 border-amber-600/80 select-none"
+              title="Open Loop: Anode is HIGH but Cathode has no ground return path"
+            >
+              NO GND
+            </span>
+          ) : (
+            <span
+              className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border bg-slate-800 text-slate-400 border-slate-700 select-none"
+              title="Unpowered: Anode is LOW"
+            >
+              OFF
+            </span>
+          )
         ) : (
           data.value || 'Red'
         )
@@ -65,7 +91,7 @@ export const LedNode: React.FC<NodeProps> = (props) => {
           x2="24"
           y2="24"
           strokeWidth="2"
-          stroke={isLit ? '#22c55e' : '#38bdf8'}
+          stroke={isAnodeHigh ? '#22c55e' : '#38bdf8'}
         />
 
         {/* Diode Triangle (Anode) */}
@@ -92,7 +118,14 @@ export const LedNode: React.FC<NodeProps> = (props) => {
         />
 
         {/* Cathode lead (right) */}
-        <line x1="44" y1="24" x2="76" y2="24" strokeWidth="2" stroke="#38bdf8" />
+        <line
+          x1="44"
+          y1="24"
+          x2="76"
+          y2="24"
+          strokeWidth="2"
+          stroke={isSimulating ? (isCathodeGrounded ? '#38bdf8' : '#475569') : '#38bdf8'}
+        />
 
         {/* Photon emission arrows (up & right) */}
         <g
