@@ -110,58 +110,100 @@ export function runCircuitSimulation(
       }
     }
 
-    // B. Propagate across connection wires
+    // B. Build nets (connected pin groups) and propagate signals through nets
+    // Build adjacency list of pins connected by wires AND passive component internal connections
+    const pinAdjacency: Record<string, string[]> = {};
+    
+    // Add wire connections
     for (const conn of graph.connections) {
       const srcPin = `${conn.sourceComponentId}.${conn.sourcePinId}`;
       const tgtPin = `${conn.targetComponentId}.${conn.targetPinId}`;
+      if (!pinAdjacency[srcPin]) pinAdjacency[srcPin] = [];
+      if (!pinAdjacency[tgtPin]) pinAdjacency[tgtPin] = [];
+      pinAdjacency[srcPin].push(tgtPin);
+      pinAdjacency[tgtPin].push(srcPin);
+    }
+    
+    // Add passive component internal connections (Switch.1 <-> Switch.2, Resistor.1 <-> Resistor.2)
+    for (const comp of graph.components) {
+      if (comp.type === 'Switch' || comp.type === 'Resistor') {
+        const pin1 = `${comp.id}.1`;
+        const pin2 = `${comp.id}.2`;
+        if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
+        if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
+        pinAdjacency[pin1].push(pin2);
+        pinAdjacency[pin2].push(pin1);
+      }
+    }
 
-      // Forward signal propagation: driver outputs (Logic Gates Y, Flip-Flop Q/Q_BAR) actively drive target pins
-      const isDriverOutput =
-        conn.sourcePinId === 'Y' ||
-        conn.sourcePinId === 'Q' ||
-        conn.sourcePinId === 'Q_BAR';
+    // Find all nets using DFS
+    const visited = new Set<string>();
+    const nets: string[][] = [];
 
-      if (isDriverOutput) {
-        const driverVal = pinStates[srcPin] ?? 0;
-        if (pinStates[tgtPin] !== driverVal) {
-          pinStates[tgtPin] = driverVal;
-          changed = true;
+    for (const pin of Object.keys(pinAdjacency)) {
+      if (visited.has(pin)) continue;
+      const net: string[] = [];
+      const stack = [pin];
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        net.push(current);
+        for (const neighbor of pinAdjacency[current] || []) {
+          if (!visited.has(neighbor)) stack.push(neighbor);
         }
-      } else if (pinStates[srcPin] === 1 && pinStates[tgtPin] !== 1) {
-        pinStates[tgtPin] = 1;
-        changed = true;
+      }
+      nets.push(net);
+    }
+
+    // For each net, find driver outputs and propagate their value to all pins in the net
+    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR
+    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR']);
+    for (const net of nets) {
+      let driverValue: 0 | 1 | null = null;
+      let hasDriver = false;
+
+      // Find driver value in this net
+      for (const pin of net) {
+        const pinName = pin.split('.').pop() || '';
+        if (driverPinIds.has(pinName)) {
+          const val = pinStates[pin] ?? 0;
+          if (!hasDriver) {
+            driverValue = val;
+            hasDriver = true;
+          } else if (driverValue !== val) {
+            // Multiple drivers with conflicting values - net is contested, leave as-is
+            hasDriver = false;
+            break;
+          }
+        }
       }
 
-      // Reverse signal propagation for bidirectional elements
-      const targetComp = graph.components.find((c) => c.id === conn.targetComponentId);
-      const sourceComp = graph.components.find((c) => c.id === conn.sourceComponentId);
-
-      if (
-        (targetComp?.type === 'Resistor' || targetComp?.type === 'Switch') &&
-        pinStates[tgtPin] === 1 &&
-        pinStates[srcPin] !== 1
-      ) {
-        pinStates[srcPin] = 1;
-        changed = true;
+      // Propagate driver value to all pins in net
+      if (hasDriver && driverValue !== null) {
+        for (const pin of net) {
+          if (pinStates[pin] !== driverValue) {
+            pinStates[pin] = driverValue;
+            changed = true;
+          }
+        }
       }
 
-      if (
-        (sourceComp?.type === 'Resistor' || sourceComp?.type === 'Switch') &&
-        pinStates[tgtPin] === 1 &&
-        pinStates[srcPin] !== 1
-      ) {
-        pinStates[srcPin] = 1;
-        changed = true;
+      // Bidirectional ground reachability across the entire net
+      let netIsGrounded = false;
+      for (const pin of net) {
+        if (isGrounded[pin]) {
+          netIsGrounded = true;
+          break;
+        }
       }
-
-      // Bidirectional ground reachability across wires
-      if (isGrounded[srcPin] && !isGrounded[tgtPin]) {
-        isGrounded[tgtPin] = true;
-        changed = true;
-      }
-      if (isGrounded[tgtPin] && !isGrounded[srcPin]) {
-        isGrounded[srcPin] = true;
-        changed = true;
+      if (netIsGrounded) {
+        for (const pin of net) {
+          if (!isGrounded[pin]) {
+            isGrounded[pin] = true;
+            changed = true;
+          }
+        }
       }
     }
 
