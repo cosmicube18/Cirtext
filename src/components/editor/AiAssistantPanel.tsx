@@ -145,6 +145,17 @@ ${currentDsl.trim()}
       const activeModel = import.meta.env.VITE_OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite';
       const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
+      const chatMessages = messages.map((m) => ({ role: m.role, content: m.content }));
+      const userPayload = { role: 'user' as const, content: fullUserPrompt };
+      const allMessages = [...chatMessages, userPayload];
+      const firstIdx = allMessages.findIndex((m) => m.role === 'user');
+      if (firstIdx >= 0) {
+        allMessages[firstIdx] = {
+          role: 'user',
+          content: `${SYSTEM_INSTRUCTION}\n\nUser request: ${allMessages[firstIdx].content}`,
+        };
+      }
+
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -155,17 +166,17 @@ ${currentDsl.trim()}
         },
         body: JSON.stringify({
           model: activeModel,
-          messages: [
-            { role: 'system', content: SYSTEM_INSTRUCTION },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content: fullUserPrompt },
-          ],
+          max_tokens: 2048,
+          messages: allMessages,
         }),
       });
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        const errMsg = errJson?.error?.message || `HTTP error ${res.status}: ${res.statusText}`;
+        const errData = await res.json().catch(() => ({}));
+        const errMsg =
+          errData?.error?.metadata?.raw ||
+          errData?.error?.message ||
+          'Provider returned error';
         throw new Error(errMsg);
       }
 
