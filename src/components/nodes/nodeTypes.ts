@@ -46,6 +46,8 @@ export const circuitNodeTypes: NodeTypes = {
   SCD41: MultiPinModuleNode,
   BH1750: MultiPinModuleNode,
   SHT31: MultiPinModuleNode,
+  Boost5V: MultiPinModuleNode,
+  TP4056: MultiPinModuleNode,
 
   // Displays
   OLED_SSD1306: OledNode,

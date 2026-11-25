@@ -38,6 +38,8 @@ Here are the strict syntax rules:
    - Capacitor: pins "1", "2"
    - LED: pins "anode", "cathode"
 - Buzzer: pins "pos", "neg"
+- Boost5V: pins "VIN", "GND", "VOUT", "GND2"
+- TP4056: pins "IN+", "IN-", "BAT+", "BAT-"
    - Ground: pin "1"
 
 3. CONNECTIONS SYNTAX:

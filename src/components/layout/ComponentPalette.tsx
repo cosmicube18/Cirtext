@@ -28,7 +28,7 @@ const PALETTE_GROUPS: PaletteGroup[] = [
   },
   {
     name: 'Passives & Controls',
-    items: ['VoltageSource', 'Resistor', 'Capacitor', 'LED', 'Buzzer', 'Switch', 'Ground'],
+    items: ['VoltageSource', 'Resistor', 'Capacitor', 'LED', 'Buzzer', 'Boost5V', 'TP4056', 'Switch', 'Ground'],
   },
 ];
 

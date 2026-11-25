@@ -4,6 +4,8 @@ export type ComponentType =
   | 'Capacitor'
   | 'LED'
   | 'Buzzer'
+  | 'Boost5V'
+  | 'TP4056'
   | 'Ground'
   | 'Switch'
   | 'ESP32_30Pin'
@@ -95,6 +97,32 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
     pins: [
       { id: 'pos', label: '+', position: 'left', aliases: ['a', '+', 'pos', '1', 'anode'] },
       { id: 'neg', label: '-', position: 'right', aliases: ['k', 'c', '-', 'neg', '2', 'cathode'] },
+    ],
+  },
+  Boost5V: {
+    type: 'Boost5V',
+    defaultPrefix: 'U',
+    displayName: '5V Boost Converter',
+    defaultValue: '5V',
+    category: 'passives',
+    pins: [
+      { id: 'VIN', label: 'VIN', position: 'left', aliases: ['in', 'vcc', 'vin'] },
+      { id: 'GND', label: 'GND', position: 'left', aliases: ['gnd', 'ground'] },
+      { id: 'VOUT', label: 'VOUT', position: 'right', aliases: ['out', '5v', 'vout'] },
+      { id: 'GND2', label: 'GND', position: 'right', aliases: ['gnd2', 'ground2'] },
+    ],
+  },
+  TP4056: {
+    type: 'TP4056',
+    defaultPrefix: 'U',
+    displayName: 'TP4056 Charger',
+    defaultValue: 'Li-ion',
+    category: 'passives',
+    pins: [
+      { id: 'IN+', label: 'IN+', position: 'left', aliases: ['vcc', 'in+', 'vin'] },
+      { id: 'IN-', label: 'IN-', position: 'left', aliases: ['gnd', 'in-'] },
+      { id: 'BAT+', label: 'BAT+', position: 'right', aliases: ['bat+', 'b+', 'out+'] },
+      { id: 'BAT-', label: 'BAT-', position: 'right', aliases: ['bat-', 'b-', 'out-'] },
     ],
   },
   Ground: {
@@ -437,6 +465,16 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     sounder: 'Buzzer',
     bz: 'Buzzer',
     b: 'Buzzer',
+
+    boost5v: 'Boost5V',
+    boost: 'Boost5V',
+    mt3608: 'Boost5V',
+    boostconverter: 'Boost5V',
+
+    tp4056: 'TP4056',
+    tp_4056: 'TP4056',
+    charger: 'TP4056',
+    chargingmodule: 'TP4056',
 
     ground: 'Ground',
     gnd: 'Ground',

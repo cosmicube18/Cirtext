@@ -88,6 +88,8 @@ function compareComponents(a: CircuitComponent, b: CircuitComponent): number {
     Capacitor: 6,
     LED: 7,
     Buzzer: 7.5,
+    Boost5V: 1.5,
+    TP4056: 1.6,
     SCD41: 8,
     BH1750: 9,
     SHT31: 10,
