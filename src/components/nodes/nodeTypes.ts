@@ -3,6 +3,7 @@ import { VoltageSourceNode } from './VoltageSourceNode.tsx';
 import { ResistorNode } from './ResistorNode.tsx';
 import { CapacitorNode } from './CapacitorNode.tsx';
 import { LedNode } from './LedNode.tsx';
+import { BuzzerNode } from './BuzzerNode.tsx';
 import { GroundNode } from './GroundNode.tsx';
 import { SwitchNode } from './SwitchNode.tsx';
 import { Esp32Node } from './Esp32Node.tsx';
@@ -18,6 +19,7 @@ export const circuitNodeTypes: NodeTypes = {
   Resistor: ResistorNode,
   Capacitor: CapacitorNode,
   LED: LedNode,
+  Buzzer: BuzzerNode,
   Ground: GroundNode,
   Switch: SwitchNode,
 

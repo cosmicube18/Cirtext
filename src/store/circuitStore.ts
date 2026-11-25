@@ -478,7 +478,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes: [],
       edges: [],
       diagnostics: [],
-      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, edgeStates: {}, flipFlopStates: {} },
+      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, buzzerStates: {}, edgeStates: {}, flipFlopStates: {} },
       flipFlopStates: {},
       lastUpdatedBy: 'canvas',
     });

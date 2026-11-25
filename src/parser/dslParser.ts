@@ -112,7 +112,7 @@ export function parseDsl(dslText: string, existingGraph?: CircuitGraph): ParseRe
         diagnostics.push({
           line: lineNum,
           severity: 'error',
-          message: `Unknown component type "${rawType}". Supported: VoltageSource, Resistor, Capacitor, LED, Ground.`,
+          message: `Unknown component type "${rawType}". Supported: VoltageSource, Resistor, Capacitor, LED, Buzzer, Ground.`,
           rawLine,
         });
         return;

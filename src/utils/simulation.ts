@@ -11,6 +11,7 @@ export interface SimulationResult {
   pinStates: Record<string, 0 | 1>;
   isGrounded: Record<string, boolean>;
   ledStates: Record<string, boolean>;
+  buzzerStates: Record<string, boolean>;
   edgeStates: Record<string, 0 | 1>;
   flipFlopStates: FlipFlopStates;
 }
@@ -336,6 +337,16 @@ export function runCircuitSimulation(
     }
   }
 
+  // 3b. Evaluate buzzer state:
+  const buzzerStates: Record<string, boolean> = {};
+  for (const comp of graph.components) {
+    if (comp.type === 'Buzzer') {
+      const posHigh = pinStates[`${comp.id}.pos`] === 1;
+      const negGrounded = Boolean(isGrounded[`${comp.id}.neg`]);
+      buzzerStates[comp.id] = posHigh && negGrounded;
+    }
+  }
+
   // 4. Evaluate energized status of connection wires
   const edgeStates: Record<string, 0 | 1> = {};
   for (const conn of graph.connections) {
@@ -349,6 +360,7 @@ export function runCircuitSimulation(
     pinStates,
     isGrounded,
     ledStates,
+    buzzerStates,
     edgeStates,
     flipFlopStates,
   };

@@ -3,6 +3,7 @@ export type ComponentType =
   | 'Resistor'
   | 'Capacitor'
   | 'LED'
+  | 'Buzzer'
   | 'Ground'
   | 'Switch'
   | 'ESP32_30Pin'
@@ -83,6 +84,17 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
     pins: [
       { id: 'anode', label: 'A', position: 'left', aliases: ['a', '+', 'pos', '1'] },
       { id: 'cathode', label: 'K', position: 'right', aliases: ['k', 'c', '-', 'neg', '2'] },
+    ],
+  },
+  Buzzer: {
+    type: 'Buzzer',
+    defaultPrefix: 'BZ',
+    displayName: 'Buzzer',
+    defaultValue: 'Piezo',
+    category: 'passives',
+    pins: [
+      { id: 'pos', label: '+', position: 'left', aliases: ['a', '+', 'pos', '1', 'anode'] },
+      { id: 'neg', label: '-', position: 'right', aliases: ['k', 'c', '-', 'neg', '2', 'cathode'] },
     ],
   },
   Ground: {
@@ -419,6 +431,12 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     led: 'LED',
     diodered: 'LED',
     d: 'LED',
+
+    buzzer: 'Buzzer',
+    piezo: 'Buzzer',
+    sounder: 'Buzzer',
+    bz: 'Buzzer',
+    b: 'Buzzer',
 
     ground: 'Ground',
     gnd: 'Ground',

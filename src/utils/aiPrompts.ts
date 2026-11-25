@@ -37,6 +37,7 @@ Here are the strict syntax rules:
    - Resistor: pins "1", "2"
    - Capacitor: pins "1", "2"
    - LED: pins "anode", "cathode"
+- Buzzer: pins "pos", "neg"
    - Ground: pin "1"
 
 3. CONNECTIONS SYNTAX:
