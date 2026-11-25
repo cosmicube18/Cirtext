@@ -6,6 +6,7 @@ import { CircuitCanvas } from './components/canvas/CircuitCanvas.tsx';
 import { TextEditor } from './components/editor/TextEditor.tsx';
 import { AiAssistantPanel } from './components/editor/AiAssistantPanel.tsx';
 import { AIPromptModal } from './components/editor/AIPromptModal.tsx';
+import { Esp32CodeModal } from './components/editor/Esp32CodeModal.tsx';
 import { useCircuitStore } from './store/circuitStore.ts';
 
 export const App: React.FC = () => {
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
     deleteEdges,
   } = useCircuitStore();
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [esp32CodeModal, setEsp32CodeModal] = useState<{ isOpen: boolean; componentId: string }>({ isOpen: false, componentId: '' });
   const [activeRightTab, setActiveRightTab] = useState<'text' | 'ai'>('ai');
   const [mobileTab, setMobileTab] = useState<'canvas' | 'text' | 'ai'>('canvas');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
@@ -32,6 +34,14 @@ export const App: React.FC = () => {
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
+  }, []);
+
+  const handleOpenEsp32Code = useCallback((componentId: string) => {
+    setEsp32CodeModal({ isOpen: true, componentId });
+  }, []);
+
+  const handleCloseEsp32Code = useCallback(() => {
+    setEsp32CodeModal({ isOpen: false, componentId: '' });
   }, []);
 
   useEffect(() => {
@@ -96,6 +106,7 @@ export const App: React.FC = () => {
             onConnectEdge={connectPins}
             onNodesDelete={deleteNodes}
             onEdgesDelete={deleteEdges}
+            onOpenEsp32Code={handleOpenEsp32Code}
           />
           {leftPanelCollapsed && (
             <button
@@ -240,6 +251,13 @@ export const App: React.FC = () => {
       <AIPromptModal
         isOpen={isAiModalOpen}
         onClose={() => setIsAiModalOpen(false)}
+      />
+
+      {/* ESP32 Code Modal */}
+      <Esp32CodeModal
+        isOpen={esp32CodeModal.isOpen}
+        onClose={handleCloseEsp32Code}
+        esp32ComponentId={esp32CodeModal.componentId}
       />
     </div>
   );

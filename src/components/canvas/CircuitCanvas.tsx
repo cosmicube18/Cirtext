@@ -26,6 +26,7 @@ export interface CircuitCanvasProps {
   onConnectEdge?: (connection: Connection) => void;
   onNodesDelete?: (deletedNodes: CircuitNode[]) => void;
   onEdgesDelete?: (deletedEdges: CircuitEdge[]) => void;
+  onOpenEsp32Code?: (componentId: string) => void;
 }
 
 export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
@@ -36,6 +37,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
   onConnectEdge,
   onNodesDelete,
   onEdgesDelete,
+  onOpenEsp32Code,
 }) => {
   const [selectedNodes, setSelectedNodes] = useState<CircuitNode[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<CircuitEdge[]>([]);
@@ -122,6 +124,15 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
     }
   }, [selectedNodes, selectedEdges, onNodesDelete, onEdgesDelete]);
 
+  const handleNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: CircuitNode) => {
+      if (node.data.componentType === 'ESP32_30Pin' && onOpenEsp32Code) {
+        onOpenEsp32Code(node.id);
+      }
+    },
+    [onOpenEsp32Code]
+  );
+
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
 
   return (
@@ -164,6 +175,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         onNodesDelete={handleNodesDelete}
         onEdgesDelete={handleEdgesDelete}
         onSelectionChange={handleSelectionChange}
+        onNodeDoubleClick={handleNodeDoubleClick}
         deleteKeyCode={['Backspace', 'Delete']}
         connectionMode={ConnectionMode.Loose}
         fitView

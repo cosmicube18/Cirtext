@@ -12,7 +12,8 @@ import { parseDsl } from '../parser/dslParser.ts';
 import { serializeGraph } from '../parser/dslSerializer.ts';
 import { SAMPLE_CIRCUITS, type CircuitSample } from '../parser/sampleCircuits.ts';
 import { calculateAutoLayout } from '../utils/layout.ts';
-import { runCircuitSimulation, type SimulationResult, type FlipFlopStates } from '../utils/simulation.ts';
+import { runCircuitSimulation, type SimulationResult, type FlipFlopStates, type Esp32GpioStates } from '../utils/simulation.ts';
+import { esp32RuntimeManager } from '../simulation/esp32/Esp32RuntimeManager.ts';
 
 export interface CircuitState {
   dslText: string;
@@ -30,6 +31,7 @@ export interface CircuitState {
   clockIntervalId: ReturnType<typeof setInterval> | null;
   flipFlopStates: FlipFlopStates; // componentId -> { q, prevClk }
   simulationState: SimulationResult;
+  esp32GpioStates: Esp32GpioStates; // ESP32 componentId -> pinId -> 0|1
 
   // Actions
   setDslText: (text: string) => Promise<void>;
@@ -47,6 +49,8 @@ export interface CircuitState {
   // Simulation Actions
   toggleSimulation: () => void;
   toggleSwitch: (switchId: string) => void;
+  setEsp32GpioStates: (gpioStates: Esp32GpioStates) => void;
+  _recomputeSimulation: () => void;
 }
 
 function graphToNodesAndEdges(
@@ -134,7 +138,8 @@ initialParse.graph.components.forEach((c) => {
 });
 
 const initialSwitchStates: Record<string, boolean> = { SW1: true, SW2: false };
-const initialSimResult = runCircuitSimulation(initialParse.graph, initialSwitchStates, {}, false);
+const initialEsp32GpioStates: Esp32GpioStates = {};
+const initialSimResult = runCircuitSimulation(initialParse.graph, initialSwitchStates, {}, false, initialEsp32GpioStates);
 const initialFlow = graphToNodesAndEdges(initialParse.graph, false, initialSimResult);
 
 export const useCircuitStore = create<CircuitState>((set, get) => ({
@@ -152,6 +157,32 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   clockIntervalId: null,
   flipFlopStates: {},
   simulationState: initialSimResult,
+  esp32GpioStates: initialEsp32GpioStates,
+
+  // Helper to recompute simulation with current state
+  _recomputeSimulation: () => {
+    const state = get();
+    const simResult = runCircuitSimulation(
+      state.graph,
+      state.switchStates,
+      state.flipFlopStates,
+      state.clockHigh,
+      state.esp32GpioStates
+    );
+    const { nodes, edges } = graphToNodesAndEdges(state.graph, state.isSimulating, simResult);
+    set({
+      simulationState: simResult,
+      flipFlopStates: simResult.flipFlopStates,
+      nodes,
+      edges,
+    });
+  },
+
+  setEsp32GpioStates: (gpioStates: Esp32GpioStates) => {
+    set({ esp32GpioStates: gpioStates }, false);
+    // Trigger immediate re-simulation
+    get()._recomputeSimulation();
+  },
 
   setDslText: async (newText: string) => {
     const currentGraph = get().graph;
@@ -163,7 +194,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     );
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(result.graph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(result.graph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(result.graph, isSim, simResult);
 
     set({
@@ -226,7 +257,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
 
     const newDsl = serializeGraph(updatedGraph);
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
 
     set({
@@ -273,7 +304,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
@@ -322,7 +353,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
@@ -361,7 +392,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
@@ -393,7 +424,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
@@ -429,7 +460,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
 
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
 
     set({
@@ -446,7 +477,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   loadSample: async (sample: CircuitSample) => {
     const parseResult = parseDsl(sample.dsl);
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(parseResult.graph, get().switchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(parseResult.graph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(parseResult.graph, isSim, simResult);
 
     set({
@@ -489,7 +520,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     const currentGraph = get().graph;
     const currentFlipFlopStates = nextSimulating ? get().flipFlopStates : {};
     const currentClockHigh = nextSimulating ? get().clockHigh : false;
-    const simResult = runCircuitSimulation(currentGraph, get().switchStates, currentFlipFlopStates, currentClockHigh);
+    const simResult = runCircuitSimulation(currentGraph, get().switchStates, currentFlipFlopStates, currentClockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(currentGraph, nextSimulating, simResult);
 
     if (nextSimulating) {
@@ -498,7 +529,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
         const state = get();
         if (!state.isSimulating) return;
         const nextClockHigh = !state.clockHigh;
-        const nextSimResult = runCircuitSimulation(state.graph, state.switchStates, state.flipFlopStates, nextClockHigh);
+        const nextSimResult = runCircuitSimulation(state.graph, state.switchStates, state.flipFlopStates, nextClockHigh, state.esp32GpioStates);
         const { nodes: nextNodes, edges: nextEdges } = graphToNodesAndEdges(state.graph, true, nextSimResult);
         set({
           clockHigh: nextClockHigh,
@@ -543,7 +574,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     };
     const currentGraph = get().graph;
     const isSim = get().isSimulating;
-    const simResult = runCircuitSimulation(currentGraph, nextSwitchStates, get().flipFlopStates, get().clockHigh);
+    const simResult = runCircuitSimulation(currentGraph, nextSwitchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(currentGraph, isSim, simResult);
 
     set({
@@ -555,3 +586,10 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     });
   },
 }));
+
+// Register the ESP32 runtime -> circuit solver bridge once at module initialization.
+// This keeps GPIO updates wired to the solver permanently, independent of the
+// ESP32 code modal lifecycle (closing the modal must never disconnect GPIO updates).
+esp32RuntimeManager.setSimulationTrigger((gpioStates) => {
+  useCircuitStore.getState().setEsp32GpioStates(gpioStates);
+});

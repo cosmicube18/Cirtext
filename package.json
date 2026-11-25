@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@xyflow/react": "^13.0.2",
+    "@yowasp/clang": "^22.0.0-git20695-13",
     "elkjs": "^0.12.1",
     "html-to-image": "^1.11.11",
     "lucide-react": "^1.78.0",

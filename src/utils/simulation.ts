@@ -1,4 +1,5 @@
 import type { CircuitGraph } from '../types/circuit.ts';
+import { COMPONENT_METADATA } from '../types/circuit.ts';
 
 export interface FlipFlopState {
   q: boolean;
@@ -6,6 +7,9 @@ export interface FlipFlopState {
 }
 
 export type FlipFlopStates = Record<string, FlipFlopState>;
+
+// ESP32 GPIO states: componentId -> pinId -> 0 | 1
+export type Esp32GpioStates = Record<string, Record<string, 0 | 1>>;
 
 export interface SimulationResult {
   pinStates: Record<string, 0 | 1>;
@@ -27,10 +31,14 @@ export function runCircuitSimulation(
   graph: CircuitGraph,
   switchStates: Record<string, boolean>,
   flipFlopStates: FlipFlopStates = {},
-  clockHigh: boolean = false
+  clockHigh: boolean = false,
+  esp32GpioStates: Esp32GpioStates = {}
 ): SimulationResult {
   const pinStates: Record<string, 0 | 1> = {};
   const isGrounded: Record<string, boolean> = {};
+  // Full pin keys (e.g. `U1.D2`) that act as active voltage sources, so their HIGH
+  // value propagates through nets exactly like a fixed 3.3V regulator output.
+  const activeSourcePins = new Set<string>();
 
   // 1. Initialize fixed power sources, explicit ground nets, and default logic gate pins
   for (const comp of graph.components) {
@@ -66,9 +74,39 @@ export function runCircuitSimulation(
       pinStates[`${comp.id}.VIN`] = 0;
       pinStates[`${comp.id}.GND`] = 0;
       pinStates[`${comp.id}.GND2`] = 0;
-      pinStates[`${comp.id}.3V3`] = 0;
+      pinStates[`${comp.id}.3V3`] = 1; // 3V3 regulator output always HIGH when powered
       isGrounded[`${comp.id}.GND`] = true;
       isGrounded[`${comp.id}.GND2`] = true;
+      // 3V3 is an active source: its HIGH value drives connected nets.
+      activeSourcePins.add(`${comp.id}.3V3`);
+
+      // Apply live ESP32 GPIO states from the runtime.
+      // The runtime emits pin keys like `D2`; be lenient and also accept the
+      // metadata `label`/`id` and aliases (`GPIO2`, `2`, `gpio2`).
+      const gpioStates = esp32GpioStates[comp.id];
+      if (gpioStates) {
+        const esp32Meta = COMPONENT_METADATA.ESP32_30Pin;
+        const resolvePinId = (key: string): string => {
+          const lower = key.toLowerCase();
+          const match = esp32Meta.pins.find(
+            (p) =>
+              p.id.toLowerCase() === lower ||
+              p.label.toLowerCase() === lower ||
+              (p.aliases ?? []).some((alias) => alias.toLowerCase() === lower)
+          );
+          return match ? match.id : key;
+        };
+
+        for (const [pinKey, value] of Object.entries(gpioStates)) {
+          const fullPin = `${comp.id}.${resolvePinId(pinKey)}`;
+          pinStates[fullPin] = value;
+          // A HIGH GPIO pin behaves as an active 3.3V source so current can flow
+          // through the connected load (e.g. U1.D2 -> R1 -> D1 -> U1.GND2).
+          if (value === 1) {
+            activeSourcePins.add(fullPin);
+          }
+        }
+      }
     } else if (comp.type === 'TP4056') {
       pinStates[`${comp.id}.IN+`] = 0;
       pinStates[`${comp.id}.IN-`] = 0;
@@ -278,7 +316,7 @@ export function runCircuitSimulation(
       // Find driver value in this net
       for (const pin of net) {
         const pinName = pin.split('.').pop() || '';
-        if (driverPinIds.has(pinName)) {
+        if (driverPinIds.has(pinName) || activeSourcePins.has(pin)) {
           const val = pinStates[pin] ?? 0;
           if (!hasDriver) {
             driverValue = val;
