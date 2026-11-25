@@ -201,8 +201,8 @@ ${currentDsl.trim()}
           body: JSON.stringify({
             model: activeModel,
             models: modelsList,
-            max_tokens: 2048,
-            reasoning: { enabled: false },
+            max_tokens: 4096,
+            reasoning: { effort: 'low' },
             messages: allMessages,
           }),
         });
