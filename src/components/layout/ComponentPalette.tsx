@@ -77,7 +77,7 @@ export const ComponentPalette: React.FC<ComponentPaletteProps> = ({
 
       {/* Palette Container: visible on desktop, modal drawer on mobile */}
       <div
-        className={`absolute top-3 left-3 z-20 flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-slate-800 shadow-2xl w-60 select-none transition-all duration-200 ${
+        className={`absolute top-3 left-3 z-20 flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-slate-800 shadow-2xl w-60 max-h-[calc(100vh-24px)] overflow-y-auto select-none transition-all duration-200 ${
           isOpenMobile ? 'block' : 'hidden md:block'
         }`}
       >

@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
-  Key,
   Send,
   Loader2,
   Check,
   RotateCcw,
-  Trash2,
-  Eye,
-  EyeOff,
   Bot,
   User,
   AlertCircle,
@@ -16,8 +12,6 @@ import {
   Cpu,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
-
-const MODEL_ID_DEFAULT = 'gemini-3.1-flash-lite-preview';
 
 const SYSTEM_INSTRUCTION = `You are an expert Electronic Circuit Designer and DSL Assistant.
 
@@ -77,17 +71,12 @@ export interface AiAssistantPanelProps {
 export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ onClose }) => {
   const { setDslText, applyAutoLayout } = useCircuitStore();
 
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('cirtext_gemini_api_key') || '');
-  const [modelId, setModelId] = useState<string>(MODEL_ID_DEFAULT);
-  const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(() => !localStorage.getItem('cirtext_gemini_api_key'));
-  const [showApiKeyText, setShowApiKeyText] = useState<boolean>(false);
-
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hello! I'm your Gemini 3.1 Flash Lite AI Circuit Assistant. Describe any circuit or modification in plain English (e.g., 'Add a 10k pull-up resistor to SDA and SCL' or 'Create an ESP32 with OLED display and temperature sensor'), and I will automatically build and layout your schematic!",
+        "Hello! I'm your OpenRouter AI Circuit Assistant. Describe any circuit or modification in plain English, and I will automatically build and layout your schematic!",
     },
   ]);
 
@@ -101,24 +90,6 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ onClose }) =
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-
-  const handleSaveApiKey = (keyToSave: string) => {
-    const trimmed = keyToSave.trim();
-    setApiKey(trimmed);
-    if (trimmed) {
-      localStorage.setItem('cirtext_gemini_api_key', trimmed);
-      setShowApiKeyInput(false);
-      setErrorMsg(null);
-    } else {
-      localStorage.removeItem('cirtext_gemini_api_key');
-    }
-  };
-
-  const handleClearApiKey = () => {
-    setApiKey('');
-    localStorage.removeItem('cirtext_gemini_api_key');
-    setShowApiKeyInput(true);
-  };
 
   const extractDsl = (text: string): { explanation: string; dsl: string | null } => {
     const match = text.match(/```(?:cirtext|text)?\s*([\s\S]*?)```/i);
@@ -147,12 +118,6 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ onClose }) =
     const promptText = inputPrompt.trim();
     if (!promptText || isLoading) return;
 
-    if (!apiKey) {
-      setErrorMsg('Please enter and save your Gemini API Key first.');
-      setShowApiKeyInput(true);
-      return;
-    }
-
     setErrorMsg(null);
     setInputPrompt('');
 
@@ -177,28 +142,24 @@ ${currentDsl.trim()}
 \`\`\`
 `;
 
-      const activeModel = modelId.trim() || MODEL_ID_DEFAULT;
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
+      const activeModel = import.meta.env.VITE_OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite';
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
-      const res = await fetch(endpoint, {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-OpenRouter-Title': 'Cirtext',
         },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: SYSTEM_INSTRUCTION }],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: fullUserPrompt }],
-            },
+          model: activeModel,
+          messages: [
+            { role: 'system', content: SYSTEM_INSTRUCTION },
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+            { role: 'user', content: fullUserPrompt },
           ],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 8192,
-          },
         }),
       });
 
@@ -209,8 +170,11 @@ ${currentDsl.trim()}
       }
 
       const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error?.message || 'OpenRouter error');
+      }
       const rawResponseText =
-        data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        data.choices?.[0]?.message?.content ||
         'No response generated from model.';
 
       const { explanation, dsl } = extractDsl(rawResponseText);
@@ -225,13 +189,12 @@ ${currentDsl.trim()}
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // Auto-apply if DSL found
       if (dsl) {
         await handleApplyDsl(dsl);
       }
     } catch (err: any) {
-      console.error('Gemini API call failed:', err);
-      setErrorMsg(err.message || 'Failed to communicate with Gemini API.');
+      console.error('OpenRouter API call failed:', err);
+      setErrorMsg(err.message || 'Failed to communicate with OpenRouter API.');
     } finally {
       setIsLoading(false);
     }
@@ -257,19 +220,6 @@ ${currentDsl.trim()}
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            title="Configure Gemini API Key"
-            className={`p-1.5 rounded-lg border text-xs transition-colors flex items-center gap-1 ${
-              apiKey
-                ? 'bg-slate-800 border-slate-700 text-emerald-400 hover:bg-slate-750'
-                : 'bg-amber-950/60 border-amber-800/80 text-amber-300 animate-pulse'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span className="text-[10px] hidden sm:inline">{apiKey ? 'API Key Set' : 'Set API Key'}</span>
-          </button>
-
           {onClose && (
             <button
               onClick={onClose}
@@ -280,74 +230,6 @@ ${currentDsl.trim()}
           )}
         </div>
       </div>
-
-      {/* API Key Configuration Dropdown / Banner */}
-      {showApiKeyInput && (
-        <div className="p-3 bg-slate-950 border-b border-slate-800 space-y-2.5 animate-in slide-in-from-top duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-sky-400" />
-              Google Gemini API Key (BYOK)
-            </span>
-            <button
-              onClick={() => setShowApiKeyInput(false)}
-              className="text-slate-400 hover:text-slate-200 text-xs"
-            >
-              Close
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-400 leading-tight">
-            Your API key is stored securely in your browser's <code className="text-sky-300">localStorage</code> and never sent to any proxy server. Get a key from Google AI Studio.
-          </p>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type={showApiKeyText ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500 font-mono pr-8"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKeyText(!showApiKeyText)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-              >
-                {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            <button
-              onClick={() => handleSaveApiKey(apiKey)}
-              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow transition-colors shrink-0"
-            >
-              Save Key
-            </button>
-
-            {apiKey && (
-              <button
-                onClick={handleClearApiKey}
-                title="Remove API Key"
-                className="p-1.5 rounded-lg bg-rose-950/60 border border-rose-800/80 text-rose-300 hover:bg-rose-900 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Model ID Config (Locked to Flash Lite Preview with fallback override) */}
-          <div className="pt-1 flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 shrink-0 font-mono">Model:</span>
-            <input
-              type="text"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-              className="flex-1 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] font-mono text-sky-300 focus:outline-none focus:border-sky-500"
-            />
-          </div>
-        </div>
-      )}
 
       {/* Success Toast */}
       {successToast && (
