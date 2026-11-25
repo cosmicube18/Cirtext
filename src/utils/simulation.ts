@@ -62,6 +62,27 @@ export function runCircuitSimulation(
       pinStates[`${comp.id}.Q_BAR`] = saved?.q ? 0 : 1;
     } else if (comp.type === 'Clock') {
       pinStates[`${comp.id}.OUT`] = clockHigh ? 1 : 0;
+    } else if (comp.type === 'ESP32_30Pin') {
+      pinStates[`${comp.id}.VIN`] = 0;
+      pinStates[`${comp.id}.GND`] = 0;
+      pinStates[`${comp.id}.GND2`] = 0;
+      pinStates[`${comp.id}.3V3`] = 0;
+      isGrounded[`${comp.id}.GND`] = true;
+      isGrounded[`${comp.id}.GND2`] = true;
+    } else if (comp.type === 'TP4056') {
+      pinStates[`${comp.id}.IN+`] = 0;
+      pinStates[`${comp.id}.IN-`] = 0;
+      pinStates[`${comp.id}.BAT+`] = 0;
+      pinStates[`${comp.id}.BAT-`] = 0;
+      isGrounded[`${comp.id}.IN-`] = true;
+      isGrounded[`${comp.id}.BAT-`] = true;
+    } else if (comp.type === 'Boost5V') {
+      pinStates[`${comp.id}.VIN`] = 0;
+      pinStates[`${comp.id}.GND`] = 0;
+      pinStates[`${comp.id}.VOUT`] = 0;
+      pinStates[`${comp.id}.GND2`] = 0;
+      isGrounded[`${comp.id}.GND`] = true;
+      isGrounded[`${comp.id}.GND2`] = true;
     }
   }
 
@@ -111,6 +132,81 @@ export function runCircuitSimulation(
           changed = true;
         } else if (isGrounded[pin2] && !isGrounded[pin1]) {
           isGrounded[pin1] = true;
+          changed = true;
+        }
+      }
+    }
+
+    // Power component propagation: ESP32_30Pin, TP4056, Boost5V
+    for (const comp of graph.components) {
+      // ESP32_30Pin: VIN (5V in) -> 3V3 (3.3V out), GND/GND2 always grounded
+      if (comp.type === 'ESP32_30Pin') {
+        const vinPin = `${comp.id}.VIN`;
+        const v33Pin = `${comp.id}.3V3`;
+        const gndPin = `${comp.id}.GND`;
+        const gnd2Pin = `${comp.id}.GND2`;
+
+        // If VIN is HIGH (5V supplied), drive 3V3 HIGH (regulator output)
+        if (pinStates[vinPin] === 1 && pinStates[v33Pin] !== 1) {
+          pinStates[v33Pin] = 1;
+          changed = true;
+        }
+        // Back-powering: if 3V3 is externally driven HIGH, keep it HIGH
+        // (already handled by net propagation, but ensure GNDs stay grounded)
+        if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
+          isGrounded[gnd2Pin] = true;
+          changed = true;
+        } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
+          isGrounded[gndPin] = true;
+          changed = true;
+        }
+      }
+
+      // TP4056: IN+/IN- (charge input) -> BAT+/BAT- (battery output)
+      else if (comp.type === 'TP4056') {
+        const inPlusPin = `${comp.id}.IN+`;
+        const inMinusPin = `${comp.id}.IN-`;
+        const batPlusPin = `${comp.id}.BAT+`;
+        const batMinusPin = `${comp.id}.BAT-`;
+
+        // Charging active: IN+ HIGH AND IN- grounded -> BAT+ HIGH (charging ~4.2V)
+        const charging = pinStates[inPlusPin] === 1 && isGrounded[inMinusPin];
+        if (charging && pinStates[batPlusPin] !== 1) {
+          pinStates[batPlusPin] = 1;
+          changed = true;
+        }
+        // If no charging input, assume battery connected -> BAT+ HIGH (simplified)
+        else if (!charging && pinStates[batPlusPin] === 0) {
+          // Check if BAT+ is connected to anything (has net connections)
+          // For simplicity, treat as HIGH if any load could be connected
+          // In practice, net propagation will handle external drive
+        }
+        // BAT- always grounded
+        if (isGrounded[batMinusPin] && !isGrounded[inMinusPin]) {
+          isGrounded[inMinusPin] = true;
+          changed = true;
+        }
+      }
+
+      // Boost5V: VIN/GND (battery in) -> VOUT/GND2 (5V out)
+      else if (comp.type === 'Boost5V') {
+        const vinPin = `${comp.id}.VIN`;
+        const gndPin = `${comp.id}.GND`;
+        const voutPin = `${comp.id}.VOUT`;
+        const gnd2Pin = `${comp.id}.GND2`;
+
+        // Boost active: VIN HIGH AND GND grounded -> VOUT HIGH (5V output)
+        const boosting = pinStates[vinPin] === 1 && isGrounded[gndPin];
+        if (boosting && pinStates[voutPin] !== 1) {
+          pinStates[voutPin] = 1;
+          changed = true;
+        }
+        // GND and GND2 always same potential (both grounded)
+        if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
+          isGrounded[gnd2Pin] = true;
+          changed = true;
+        } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
+          isGrounded[gndPin] = true;
           changed = true;
         }
       }
@@ -173,8 +269,8 @@ export function runCircuitSimulation(
     }
 
     // For each net, find driver outputs and propagate their value to all pins in the net
-    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR, Clock OUT
-    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR', 'OUT']);
+    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR, Clock OUT, Power outputs (3V3, BAT+, VOUT)
+    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR', 'OUT', '3V3', 'BAT+', 'VOUT']);
     for (const net of nets) {
       let driverValue: 0 | 1 | null = null;
       let hasDriver = false;

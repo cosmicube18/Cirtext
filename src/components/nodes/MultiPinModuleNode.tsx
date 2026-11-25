@@ -16,7 +16,22 @@ export const MultiPinModuleNode: React.FC<NodeProps> = (props) => {
   const rightPins = meta?.pins.filter((p) => p.position === 'right') || [];
   const maxRows = Math.max(leftPins.length, rightPins.length, 2);
 
-  const getPinColor = (pinId: string) => {
+  const getPinColor = (pinId: string, componentType?: string) => {
+    // Power pins for TP4056
+    if (componentType === 'TP4056') {
+      if (pinId === 'IN+') return 'text-rose-400 font-bold';      // 5V charge input
+      if (pinId === 'IN-') return 'text-slate-400 font-semibold'; // Charge input ground
+      if (pinId === 'BAT+') return 'text-emerald-400 font-bold';  // Battery output (~4.2V)
+      if (pinId === 'BAT-') return 'text-slate-400 font-semibold'; // Battery ground
+    }
+    // Power pins for Boost5V
+    if (componentType === 'Boost5V') {
+      if (pinId === 'VIN') return 'text-emerald-400 font-bold';   // Battery input
+      if (pinId === 'GND') return 'text-slate-400 font-semibold'; // Input ground
+      if (pinId === 'VOUT') return 'text-rose-400 font-bold';     // 5V output
+      if (pinId === 'GND2') return 'text-slate-400 font-semibold'; // Output ground
+    }
+    // Default I2C sensor pins
     if (pinId === 'VCC') return 'text-rose-400 font-semibold';
     if (pinId === 'GND') return 'text-slate-400 font-semibold';
     if (pinId === 'SDA' || pinId === 'SCL') return 'text-cyan-300 font-bold';
@@ -70,7 +85,7 @@ export const MultiPinModuleNode: React.FC<NodeProps> = (props) => {
                     style={{ top: '50%', transform: 'translateY(-50%)', left: '-6px' }}
                     className="!w-2.5 !h-2.5 !border-2 !border-sky-400 !bg-slate-950 hover:!bg-sky-400 hover:!scale-125 transition-all"
                   />
-                  <span className={`text-[10px] font-mono leading-none pl-1 ${getPinColor(leftPin.id)}`}>
+                  <span className={`text-[10px] font-mono leading-none pl-1 ${getPinColor(leftPin.id, data.componentType)}`}>
                     {leftPin.label}
                   </span>
                 </div>
@@ -84,7 +99,7 @@ export const MultiPinModuleNode: React.FC<NodeProps> = (props) => {
               {/* Right Pin Terminal + Handle */}
               {rightPin ? (
                 <div className="relative flex items-center">
-                  <span className={`text-[10px] font-mono leading-none pr-1 ${getPinColor(rightPin.id)}`}>
+                  <span className={`text-[10px] font-mono leading-none pr-1 ${getPinColor(rightPin.id, data.componentType)}`}>
                     {rightPin.label}
                   </span>
                   <Handle

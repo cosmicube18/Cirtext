@@ -119,4 +119,38 @@ R1.2 -> C1.1 [Label: V_filtered]
 C1.2 -> GND.1
 V1.neg -> GND.1`,
   },
+  {
+    id: 'power-flow-demo',
+    name: 'Power Flow: Battery -> TP4056 -> Boost5V -> ESP32',
+    description: 'Complete power chain: Li-ion battery charges via TP4056, Boost5V steps up to 5V, ESP32 regulates to 3V3 for LED',
+    dsl: `# Circuit: Power Flow Demo (Battery -> TP4056 -> Boost5V -> ESP32 -> LED)
+[COMPONENTS]
+BAT1: VoltageSource (3.7V)
+U1: TP4056 (Charger)
+U2: Boost5V (5V Boost)
+U3: ESP32_30Pin (Controller)
+D1: LED (Status)
+GND: Ground
+SW1: Switch (Enable)
+
+[CONNECTIONS]
+# Battery to TP4056 charge input
+BAT1.pos -> U1.IN+ [Label: VBAT_IN]
+BAT1.neg -> U1.IN- [Label: GND]
+
+# TP4056 battery output to Boost5V input
+U1.BAT+ -> U2.VIN [Label: VBAT]
+U1.BAT- -> U2.GND [Label: GND]
+
+# Boost5V 5V output to ESP32 VIN
+U2.VOUT -> U3.VIN [Label: 5V]
+U2.GND2 -> U3.GND [Label: GND]
+
+# ESP32 3V3 output powers LED via switch
+U3.3V3 -> SW1.1
+SW1.2 -> D1.anode [Label: 3V3_Switched]
+D1.cathode -> GND.1
+U3.GND2 -> GND.1
+U3.GND -> GND.1`,
+  },
 ];
