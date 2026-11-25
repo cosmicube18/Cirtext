@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import { Trash2 } from 'lucide-react';
 import { circuitNodeTypes } from '../nodes/nodeTypes.ts';
+import { circuitEdgeTypes } from '../edges/edgeTypes.ts';
 import type { CircuitNode, CircuitEdge } from '../../types/flow.ts';
 
 export interface CircuitCanvasProps {
@@ -69,8 +70,10 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
           sourceHandle: connection.sourceHandle,
           target: connection.target,
           targetHandle: connection.targetHandle,
-          type: 'smoothstep',
-          style: { stroke: '#38bdf8', strokeWidth: 2 },
+          type: 'wire',
+          selectable: true,
+          deletable: true,
+          style: { stroke: '#38bdf8', strokeWidth: 3 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: '#38bdf8',
@@ -133,6 +136,16 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
     [onOpenEsp32Code]
   );
 
+  const handleEdgeDoubleClick = useCallback(
+    (_event: React.MouseEvent, edge: CircuitEdge) => {
+      if (onEdgesDelete) {
+        onEdgesDelete([edge]);
+      }
+      setSelectedEdges([]);
+    },
+    [onEdgesDelete]
+  );
+
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
 
   return (
@@ -169,6 +182,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         nodes={nodes}
         edges={edges}
         nodeTypes={circuitNodeTypes}
+        edgeTypes={circuitEdgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
@@ -176,6 +190,8 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         onEdgesDelete={handleEdgesDelete}
         onSelectionChange={handleSelectionChange}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onEdgeDoubleClick={handleEdgeDoubleClick}
+        {...({ edgesDeletable: true } as any)}
         deleteKeyCode={['Backspace', 'Delete']}
         connectionMode={ConnectionMode.Loose}
         fitView
@@ -183,8 +199,10 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         snapGrid={[16, 16]}
         style={{ width: '100%', height: '100%' }}
         defaultEdgeOptions={{
-          type: 'smoothstep',
-          style: { stroke: '#94a3b8', strokeWidth: 2.2 },
+          type: 'wire',
+          selectable: true,
+          deletable: true,
+          style: { stroke: '#94a3b8', strokeWidth: 3 },
           pathOptions: { borderRadius: 8, offset: 12 },
         } as any}
       >

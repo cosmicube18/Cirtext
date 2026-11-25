@@ -30,13 +30,11 @@ Here are the strict syntax rules:
    - ESP32_30Pin:
        left pins: "EN", "VP", "VN", "D34", "D35", "D32", "D33", "D25", "D26", "D27", "D14", "D12", "D13", "GND", "VIN"
        right pins: "3V3", "GND" (or GND2), "D15", "D2", "D4", "RX2", "TX2", "D5", "D18", "D19", "GPIO21", "RX0", "TX0", "GPIO22", "D23"
-- SCD41: pins "VCC", "GND", "SCL", "SDA"
-    - BH1750: pins "VCC", "GND", "SCL", "SDA", "ADDR"
-    - SHT31: pins "VCC", "GND", "SCL", "SDA", "ADDR"
-    - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
-    - TP4056: pins "IN+", "IN-", "BAT+", "BAT-"
-    - Boost5V: pins "VIN", "GND", "VOUT", "GND2"
-    - Switch: pins "1", "2"
+   - SCD41: pins "VCC", "GND", "SCL", "SDA"
+   - BH1750: pins "VCC", "GND", "SCL", "SDA", "ADDR"
+   - SHT31: pins "VCC", "GND", "SCL", "SDA", "ADDR"
+   - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
+   - Switch: pins "1", "2"
    - VoltageSource: pins "pos", "neg"
    - Resistor: pins "1", "2"
    - Capacitor: pins "1", "2"
@@ -103,6 +101,31 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ onClose }) =
     return { explanation: text.trim(), dsl: null };
   };
 
+  const extractMessageContent = (message: unknown): string => {
+    if (!message || typeof message !== 'object') return '';
+    const content = (message as { content?: unknown }).content;
+
+    if (typeof content === 'string') {
+      return content.trim();
+    }
+
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          if (part && typeof part === 'object') {
+            const text = (part as { text?: unknown }).text;
+            if (typeof text === 'string') return text;
+          }
+          return '';
+        })
+        .join('')
+        .trim();
+    }
+
+    return '';
+  };
+
   const handleApplyDsl = async (dsl: string) => {
     try {
       setDslText(dsl);
@@ -144,8 +167,16 @@ ${currentDsl.trim()}
 \`\`\`
 `;
 
-      const activeModel = import.meta.env.VITE_OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite';
+      const activeModel =
+        import.meta.env.VITE_OPENROUTER_MODEL || 'nvidia/nemotron-3.5-super-vl:free';
       const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+
+      const failoverModels = [
+        'nvidia/nemotron-3.5-super-vl:free',
+        'nvidia/nemotron-3-ultra-550b-a55b:free',
+        'openrouter/free',
+      ];
+      const modelsList = Array.from(new Set([activeModel, ...failoverModels])).slice(0, 3);
 
       const chatMessages = messages.map((m) => ({ role: m.role, content: m.content }));
       const userPayload = { role: 'user' as const, content: fullUserPrompt };
@@ -158,37 +189,52 @@ ${currentDsl.trim()}
         };
       }
 
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-OpenRouter-Title': 'Cirtext',
-        },
-        body: JSON.stringify({
-          model: activeModel,
-          max_tokens: 2048,
-          messages: allMessages,
-        }),
-      });
+      const requestCompletion = async (): Promise<string> => {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-OpenRouter-Title': 'Cirtext',
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            models: modelsList,
+            max_tokens: 2048,
+            reasoning: { enabled: false },
+            messages: allMessages,
+          }),
+        });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg =
-          errData?.error?.metadata?.raw ||
-          errData?.error?.message ||
-          'Provider returned error';
-        throw new Error(errMsg);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg =
+            errData?.error?.metadata?.raw ||
+            errData?.error?.message ||
+            'Provider returned error';
+          throw new Error(errMsg);
+        }
+
+        const data = await res.json();
+        if (data.error) {
+          throw new Error(data.error?.message || 'OpenRouter error');
+        }
+
+        return extractMessageContent(data.choices?.[0]?.message);
+      };
+
+      let rawResponseText = await requestCompletion();
+
+      if (!rawResponseText) {
+        rawResponseText = await requestCompletion();
       }
 
-      const data = await res.json();
-      if (data.error) {
-        throw new Error(data.error?.message || 'OpenRouter error');
+      if (!rawResponseText) {
+        throw new Error(
+          'The AI model returned an empty response. Please try again.'
+        );
       }
-      const rawResponseText =
-        data.choices?.[0]?.message?.content ||
-        'No response generated from model.';
 
       const { explanation, dsl } = extractDsl(rawResponseText);
 
@@ -348,7 +394,7 @@ ${currentDsl.trim()}
               void handleSendMessage();
             }
           }}
-          placeholder="Describe a circuit or modification (e.g. Add 10k resistor)..."
+          placeholder="Describe a circuit or modification"
           rows={1}
           className="flex-1 bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none leading-relaxed"
         />

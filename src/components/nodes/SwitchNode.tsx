@@ -13,9 +13,13 @@ export const SwitchNode: React.FC<NodeProps> = (props) => {
 
   return (
     <div
-      onClick={(e) => {
-        e.stopPropagation();
-        toggleSwitch(props.id);
+      onClick={() => {
+        // Allow ReactFlow to select the node (so the delete button can appear)
+        // without toggling the switch on every click. Toggle only when the node
+        // is not already selected.
+        if (!props.selected) {
+          toggleSwitch(props.id);
+        }
       }}
       className="cursor-pointer"
       title={`Click to toggle switch (${isClosed ? 'CLOSED' : 'OPEN'})`}

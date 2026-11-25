@@ -89,7 +89,9 @@ function graphToNodesAndEdges(
       sourceHandle: conn.sourcePinId,
       target: conn.targetComponentId,
       targetHandle: conn.targetPinId,
-      type: 'smoothstep',
+      type: 'wire',
+      selectable: true,
+      deletable: true,
       label: conn.netLabel,
       animated: isLive,
       labelStyle: conn.netLabel
@@ -102,7 +104,7 @@ function graphToNodesAndEdges(
         ? isLive
           ? { stroke: '#22c55e', strokeWidth: 3, filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.8))' }
           : { stroke: '#334155', strokeWidth: 2 }
-        : { stroke: '#38bdf8', strokeWidth: 2.2 },
+        : { stroke: '#38bdf8', strokeWidth: 3 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: isSimulating ? (isLive ? '#22c55e' : '#334155') : '#38bdf8',
@@ -239,6 +241,11 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   updateEdges: (updatedEdges: CircuitEdge[]) => {
     const currentGraph = get().graph;
 
+    // Preserve selection so a rebuilt edge list keeps the clicked wire highlighted.
+    const selectedIds = new Set(
+      updatedEdges.filter((e) => e.selected).map((e) => e.id)
+    );
+
     const newConnections = updatedEdges
       .filter((e) => e.source && e.target && e.sourceHandle && e.targetHandle)
       .map((e) => ({
@@ -259,9 +266,12 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     const isSim = get().isSimulating;
     const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
+    const edgesWithSelection = edges.map((e) =>
+      selectedIds.has(e.id) ? { ...e, selected: true } : e
+    );
 
     set({
-      edges,
+      edges: edgesWithSelection,
       nodes,
       graph: updatedGraph,
       dslText: newDsl,
