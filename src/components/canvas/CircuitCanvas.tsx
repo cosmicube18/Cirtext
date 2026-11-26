@@ -1,10 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   BackgroundVariant,
   Controls,
+  Panel,
   ConnectionMode,
+  useReactFlow,
   type Connection,
   type OnNodesChange,
   type OnEdgesChange,
@@ -14,10 +17,11 @@ import {
   addEdge,
   MarkerType,
 } from '@xyflow/react';
-import { Trash2 } from 'lucide-react';
+import { Crosshair, Trash2 } from 'lucide-react';
 import { circuitNodeTypes } from '../nodes/nodeTypes.ts';
 import { circuitEdgeTypes } from '../edges/edgeTypes.ts';
 import type { CircuitNode, CircuitEdge } from '../../types/flow.ts';
+import { CENTER_VIEW_EVENT } from '../../lib/viewportEvents.ts';
 
 export interface CircuitCanvasProps {
   nodes: CircuitNode[];
@@ -30,7 +34,7 @@ export interface CircuitCanvasProps {
   onOpenEsp32Code?: (componentId: string) => void;
 }
 
-export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
+const CircuitCanvasInner: React.FC<CircuitCanvasProps> = ({
   nodes,
   edges,
   onNodesUpdate,
@@ -42,6 +46,51 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
 }) => {
   const [selectedNodes, setSelectedNodes] = useState<CircuitNode[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<CircuitEdge[]>([]);
+  const { fitView, setViewport, getNodes } = useReactFlow();
+
+  const handleCenterView = useCallback(() => {
+    if (getNodes().length > 0) {
+      void fitView({ padding: 0.25, duration: 350, maxZoom: 1.2 });
+    } else {
+      void setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 350 });
+    }
+  }, [getNodes, fitView, setViewport]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (target.isContentEditable) return true;
+      return Boolean(
+        target.closest(
+          '.monaco-editor, [contenteditable="true"], [role="textbox"]'
+        )
+      );
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key !== 'f' && key !== 'c') return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      handleCenterView();
+    };
+
+    const handleCenterRequest = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => handleCenterView());
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener(CENTER_VIEW_EVENT, handleCenterRequest);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener(CENTER_VIEW_EVENT, handleCenterRequest);
+    };
+  }, [handleCenterView]);
 
   const onNodesChange: OnNodesChange<CircuitNode> = useCallback(
     (changes) => {
@@ -216,7 +265,27 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
           className="!bg-slate-900 !border-slate-700 !shadow-xl"
           showInteractive={false}
         />
+        <Panel position="bottom-right" className="!m-0 !mb-8 !mr-2">
+          <button
+            onClick={handleCenterView}
+            title="Center view (F or C)"
+            aria-label="Center view"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900/95 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/70 text-xs font-semibold shadow-xl backdrop-blur-md transition-colors"
+          >
+            <Crosshair className="w-4 h-4 text-sky-400 shrink-0" />
+            <span className="hidden sm:inline">Center</span>
+            <kbd className="hidden md:inline text-[10px] font-mono bg-slate-800 px-1 rounded text-slate-400 border border-slate-700">
+              F
+            </kbd>
+          </button>
+        </Panel>
       </ReactFlow>
     </div>
   );
 };
+
+export const CircuitCanvas: React.FC<CircuitCanvasProps> = (props) => (
+  <ReactFlowProvider>
+    <CircuitCanvasInner {...props} />
+  </ReactFlowProvider>
+);

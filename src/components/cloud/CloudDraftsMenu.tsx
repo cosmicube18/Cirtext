@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase.ts';
+import { requestCenterView } from '../../lib/viewportEvents.ts';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 import { esp32RuntimeManager } from '../../simulation/esp32/Esp32RuntimeManager.ts';
 
@@ -119,6 +120,8 @@ export const CloudDraftsMenu: React.FC = () => {
         }
 
         esp32RuntimeManager.setCurrentCode(pending.esp32Code ?? '');
+
+        requestCenterView();
 
         if (pending.autoSave) {
           const input = window.prompt('Name this draft:', 'Untitled Circuit');
@@ -299,6 +302,8 @@ export const CloudDraftsMenu: React.FC = () => {
       }
 
       esp32RuntimeManager.setCurrentCode(draft.esp32_code ?? '');
+
+      requestCenterView();
 
       setActiveDraftId(draft.id);
       setActiveDraftTitle(draft.title);
