@@ -74,8 +74,8 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans select-none"
-      style={{ width: '100vw', height: '100vh' }}
+      className="w-screen h-dvh flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans select-none"
+      style={{ width: '100vw', height: '100dvh' }}
     >
       {/* Top CAD Navigation */}
       <Navbar
@@ -202,7 +202,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Mobile Sticky Bottom Tab Bar (< 768px) */}
-      <nav className="flex md:hidden h-14 border-t border-slate-800 bg-slate-900/98 px-2 shrink-0 items-center justify-around z-30 select-none shadow-lg">
+      <nav className="flex md:hidden h-14 border-t border-slate-800 bg-slate-900/98 px-2 shrink-0 items-center justify-around z-30 select-none shadow-lg pb-[env(safe-area-inset-bottom)]">
         <button
           onClick={() => setMobileTab('canvas')}
           className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 px-2 rounded-lg transition-all ${

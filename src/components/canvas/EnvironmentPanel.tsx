@@ -15,7 +15,7 @@ export const EnvironmentPanel: React.FC = () => {
   if (!hasEnvSensor && !isSimulating) return null;
 
   return (
-    <div className="absolute bottom-4 left-4 z-40 w-64 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md">
+    <div className="absolute bottom-16 left-4 z-40 w-64 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-200"
