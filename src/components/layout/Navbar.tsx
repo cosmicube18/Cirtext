@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wand2,
   Sparkles,
@@ -14,6 +14,8 @@ import {
   FileCode2,
   Loader2,
   Zap,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 import { SAMPLE_CIRCUITS } from '../../parser/sampleCircuits.ts';
@@ -34,12 +36,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
     clearCircuit,
     isSimulating,
     toggleSimulation,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useCircuitStore();
   const [sampleMenuOpen, setSampleMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [printLightMode, setPrintLightMode] = useState(true);
   const [validationToast, setValidationToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
 
   const handleValidate = () => {
     const errorCount = diagnostics.filter((d) => d.severity === 'error').length;
@@ -228,6 +247,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
           {isSimulating && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
           )}
+        </button>
+
+        {/* Undo / Redo */}
+        <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 border border-slate-700 text-xs font-medium">
+          <Undo2 className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 border border-slate-700 text-xs font-medium">
+          <Redo2 className="w-3.5 h-3.5" />
         </button>
 
         {/* Validate Connections Button */}

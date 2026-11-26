@@ -38,6 +38,12 @@ export interface CircuitState {
   // Rendered 16x2 text state for each LCD_I2C, keyed by component id.
   lcdDisplays: Record<string, LcdDisplayState>;
 
+  // Undo/Redo history
+  past: { dslText: string; nodes: CircuitNode[]; edges: CircuitEdge[] }[];
+  future: { dslText: string; nodes: CircuitNode[]; edges: CircuitEdge[] }[];
+  canUndo: boolean;
+  canRedo: boolean;
+
   // Actions
   setDslText: (text: string) => Promise<void>;
   updateNodes: (nodes: CircuitNode[]) => void;
@@ -56,6 +62,9 @@ export interface CircuitState {
   toggleSwitch: (switchId: string) => void;
   setEsp32GpioStates: (gpioStates: Esp32GpioStates) => void;
   setEnvironmentState: (partial: Partial<EnvironmentState>) => void;
+  undo: () => void;
+  redo: () => void;
+  _pushHistory: () => void;
   setLcdDisplayByAddress: (address: number, display: LcdDisplayState) => void;
   _recomputeSimulation: () => void;
 }
@@ -189,6 +198,10 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   esp32GpioStates: initialEsp32GpioStates,
   environmentState: { ...DEFAULT_ENVIRONMENT },
   lcdDisplays: {},
+  past: [],
+  future: [],
+  canUndo: false,
+  canRedo: false,
 
   // Helper to recompute simulation with current state
   _recomputeSimulation: () => {
@@ -219,6 +232,87 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     set({ environmentState: { ...get().environmentState, ...partial } });
   },
 
+  _pushHistory: () => {
+    const state = get();
+    const nodes = state.nodes.map(n => ({ ...n, position: { ...n.position } }));
+    const edges = state.edges.map(e => ({ ...e }));
+    const snap = { dslText: state.dslText, nodes, edges };
+    const past = [...state.past, snap].slice(-30);
+    set({ past, future: [], canUndo: past.length > 0, canRedo: false });
+  },
+
+  undo: () => {
+    const state = get();
+    if (state.past.length === 0) return;
+    const past = [...state.past];
+    const last = past.pop()!;
+    const future = [{ dslText: state.dslText, nodes: state.nodes, edges: state.edges }, ...state.future].slice(0, 30);
+    
+    // Re-parse DSL for electrical/syntax evaluation, but preserve node positions from snapshot
+    const parsed = parseDsl(last.dslText);
+    const isSim = state.isSimulating;
+    const simResult = runCircuitSimulation(parsed.graph, state.switchStates, state.flipFlopStates, state.clockHigh, state.esp32GpioStates);
+    const { nodes: freshNodes, edges: freshEdges } = graphToNodesAndEdges(parsed.graph, isSim, simResult);
+    
+    // Merge saved positions into fresh nodes
+    const posMap = new Map(last.nodes.map(n => [n.id, n.position]));
+    const nodes = freshNodes.map(n => ({
+      ...n,
+      position: posMap.get(n.id) ?? n.position,
+    }));
+    
+    set({ 
+      dslText: last.dslText, 
+      graph: parsed.graph,
+      nodes, 
+      edges: freshEdges, 
+      diagnostics: parsed.diagnostics,
+      simulationState: simResult,
+      flipFlopStates: simResult.flipFlopStates,
+      past, 
+      future, 
+      canUndo: past.length > 0, 
+      canRedo: true,
+      lastUpdatedBy: 'canvas',
+    });
+  },
+
+  redo: () => {
+    const state = get();
+    if (state.future.length === 0) return;
+    const future = [...state.future];
+    const next = future.shift()!;
+    const past = [...state.past, { dslText: state.dslText, nodes: state.nodes, edges: state.edges }].slice(-30);
+    
+    // Re-parse DSL for electrical/syntax evaluation, but preserve node positions from snapshot
+    const parsed = parseDsl(next.dslText);
+    const isSim = state.isSimulating;
+    const simResult = runCircuitSimulation(parsed.graph, state.switchStates, state.flipFlopStates, state.clockHigh, state.esp32GpioStates);
+    const { nodes: freshNodes, edges: freshEdges } = graphToNodesAndEdges(parsed.graph, isSim, simResult);
+    
+    // Merge saved positions into fresh nodes
+    const posMap = new Map(next.nodes.map(n => [n.id, n.position]));
+    const nodes = freshNodes.map(n => ({
+      ...n,
+      position: posMap.get(n.id) ?? n.position,
+    }));
+    
+    set({ 
+      dslText: next.dslText, 
+      graph: parsed.graph,
+      nodes, 
+      edges: freshEdges, 
+      diagnostics: parsed.diagnostics,
+      simulationState: simResult,
+      flipFlopStates: simResult.flipFlopStates,
+      past, 
+      future, 
+      canUndo: true, 
+      canRedo: future.length > 0,
+      lastUpdatedBy: 'canvas',
+    });
+  },
+
   setLcdDisplayByAddress: (address: number, display: LcdDisplayState) => {
     const graph = get().graph;
     const lcdComp = graph.components.find(
@@ -231,6 +325,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   setDslText: async (newText: string) => {
+    get()._pushHistory();
     const currentGraph = get().graph;
     const result = parseDsl(newText, currentGraph);
 
@@ -283,6 +378,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   updateEdges: (updatedEdges: CircuitEdge[]) => {
+    get()._pushHistory();
     const currentGraph = get().graph;
 
     // Preserve selection so a rebuilt edge list keeps the clicked wire highlighted.
@@ -326,6 +422,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   connectPins: (connection: Connection) => {
+    get()._pushHistory();
     if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) {
       return;
     }
@@ -374,6 +471,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   addComponent: (type: ComponentType, position?: { x: number; y: number }) => {
+    get()._pushHistory();
     const currentGraph = get().graph;
     const meta = COMPONENT_METADATA[type];
     const prefix = meta.defaultPrefix;
@@ -423,6 +521,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   deleteNodes: (nodesToDelete: CircuitNode[] | string[]) => {
+    get()._pushHistory();
     const idsToDelete = new Set(
       nodesToDelete.map((n) => (typeof n === 'string' ? n : n.id))
     );
@@ -462,6 +561,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   deleteEdges: (edgesToDelete: CircuitEdge[] | string[]) => {
+    get()._pushHistory();
     const idsToDelete = new Set(
       edgesToDelete.map((e) => (typeof e === 'string' ? e : e.id))
     );
@@ -498,6 +598,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   applyAutoLayout: async () => {
+    get()._pushHistory();
     set({ isLayoutRunning: true });
     const currentGraph = get().graph;
 
@@ -529,6 +630,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   loadSample: async (sample: CircuitSample) => {
+    get()._pushHistory();
     const parseResult = parseDsl(sample.dsl);
     const isSim = get().isSimulating;
     const simResult = runCircuitSimulation(parseResult.graph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
@@ -550,6 +652,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   },
 
   clearCircuit: () => {
+    get()._pushHistory();
     const emptyGraph: CircuitGraph = {
       title: 'New Circuit',
       components: [],
