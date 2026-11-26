@@ -132,7 +132,22 @@ interface I2cDeviceInfo {
 }
 
 let i2cDevices = new Map<number, I2cDeviceInfo>();
-let envState = { temperature: 25.0, humidity: 50.0, lightLux: 350, co2Ppm: 420 };
+let envState = { temperature: 28.5, humidity: 62.0, lightLux: 450, co2Ppm: 850 };
+
+// Virtual I2C peripherals. These answer the common educational sensor/LCD
+// sketches out of the box even when no matching component is placed on the
+// canvas. A real canvas component at the same address takes precedence, so
+// miswiring it still produces a NACK / offline read (kept as a teaching aid).
+const VIRTUAL_I2C_DEVICES: ReadonlyArray<I2cDeviceInfo> = [
+  { address: 0x23, type: 'BH1750', online: true },
+  { address: 0x62, type: 'SCD41', online: true },
+  { address: 0x27, type: 'LCD_I2C', online: true },
+  { address: 0x3f, type: 'LCD_I2C', online: true },
+];
+
+function getDeviceInfo(address: number): I2cDeviceInfo | undefined {
+  return i2cDevices.get(address) ?? VIRTUAL_I2C_DEVICES.find((d) => d.address === address);
+}
 
 let i2cTxAddr = 0;
 let i2cTxBuf: number[] = [];
@@ -153,7 +168,7 @@ function blankRow(): string[] {
 }
 
 function isDeviceOnline(address: number): boolean {
-  const device = i2cDevices.get(address);
+  const device = getDeviceInfo(address);
   return Boolean(device && device.online);
 }
 
@@ -190,7 +205,7 @@ function ensureLcd(address: number): LcdBuffer {
 }
 
 function generateReadBytes(address: number, len: number): number[] {
-  const device = i2cDevices.get(address);
+  const device = getDeviceInfo(address);
   const type = device?.type;
   const out: number[] = [];
 
@@ -299,8 +314,14 @@ function createImports() {
 
       // ---------------- LiquidCrystal_I2C ----------------
       js_lcd_init: (address: number) => {
-        if (!isDeviceOnline(address)) return;
+        const device = getDeviceInfo(address);
+        if (!device || !device.online) return;
         blankLcd(address);
+        // For a virtual LCD (no canvas node) surface lifecycle on the serial
+        // monitor so sketches that only use a mock display still show activity.
+        if (!i2cDevices.has(address)) {
+          enqueueMessage({ type: 'SERIAL_OUT', text: `[LCD 0x${address.toString(16)}] initialized\n` });
+        }
       },
       js_lcd_clear: (address: number) => {
         if (!isDeviceOnline(address)) return;

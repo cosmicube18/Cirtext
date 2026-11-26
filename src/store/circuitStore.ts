@@ -83,10 +83,10 @@ export interface LcdDisplayState {
 }
 
 const DEFAULT_ENVIRONMENT: EnvironmentState = {
-  temperature: 25.0,
-  humidity: 50.0,
-  lightLux: 350,
-  co2Ppm: 420,
+  temperature: 28.5,
+  humidity: 62.0,
+  lightLux: 450,
+  co2Ppm: 850,
 };
 
 function graphToNodesAndEdges(

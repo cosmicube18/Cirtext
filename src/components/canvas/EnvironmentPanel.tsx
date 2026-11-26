@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Thermometer, Droplets, Sun, Wind, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 
-const DEFAULTS = { temperature: 25.0, humidity: 50, lightLux: 350, co2Ppm: 420 };
+const DEFAULTS = { temperature: 28.5, humidity: 62, lightLux: 450, co2Ppm: 850 };
 
 export const EnvironmentPanel: React.FC = () => {
   const env = useCircuitStore((s) => s.environmentState);

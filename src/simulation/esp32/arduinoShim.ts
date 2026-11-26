@@ -293,9 +293,12 @@ public:
     ONE_TIME_LOW_RES_MODE = 0x23
   };
   BH1750(uint8_t address = 0x23) : _addr(address) {}
-  bool begin() { return js_i2c_device_online(_addr) != 0; }
-  bool begin(uint8_t mode) { (void)mode; return js_i2c_device_online(_addr) != 0; }
-  bool begin(uint8_t address, uint8_t mode) { _addr = address; (void)mode; return js_i2c_device_online(_addr) != 0; }
+  // Virtual peripheral: initialization always succeeds so standard example
+  // sketches run without a physical BH1750. Lux reads come from the simulated
+  // environment (js_sensor_value) or a linked light sensor on the canvas.
+  bool begin() { return true; }
+  bool begin(uint8_t mode) { (void)mode; return true; }
+  bool begin(uint8_t address, uint8_t mode) { _addr = address; (void)mode; return true; }
   float readLightLevel() { return (float)js_sensor_value(_addr, 2); }
 };
 typedef BH1750 Adafruit_BH1750;
@@ -304,17 +307,19 @@ class SensirionI2CScd4x {
   uint8_t _addr;
 public:
   SensirionI2CScd4x() : _addr(0x62) {}
-  void begin(TwoWire& wire) { (void)wire; }
-  void begin() {}
-  uint16_t startPeriodicMeasurement() { return js_i2c_device_online(_addr) ? 0 : 1; }
+  void begin(TwoWire& wire, uint8_t address = 0x62) { (void)wire; _addr = address; }
+  void begin(uint8_t address = 0x62) { _addr = address; }
+  // Virtual peripheral: periodic measurement starts without error so standard
+  // SCD41 example sketches initialize cleanly.
+  uint16_t startPeriodicMeasurement() { return 0; }
+  uint16_t startLowPowerPeriodicMeasurement() { return 0; }
   uint16_t stopPeriodicMeasurement() { return 0; }
+  uint16_t getDataReadyFlag(bool& isDataReady) { isDataReady = true; return 0; }
+  uint16_t setAmbientPressure(uint32_t pressure) { (void)pressure; return 0; }
+  uint16_t setSensorAltitude(uint16_t altitude) { (void)altitude; return 0; }
+  void persistSettings() {}
   uint16_t readMeasurement(uint16_t& co2, float& temperature, float& humidity) {
-    if (!js_i2c_device_online(_addr)) {
-      co2 = 0;
-      temperature = 0.0f;
-      humidity = 0.0f;
-      return 1;
-    }
+    // Values come from the simulated environment (or a linked SCD41 component).
     co2 = (uint16_t)js_sensor_value(_addr, 3);
     temperature = (float)js_sensor_value(_addr, 0);
     humidity = (float)js_sensor_value(_addr, 1);
