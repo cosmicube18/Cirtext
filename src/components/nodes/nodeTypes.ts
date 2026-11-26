@@ -13,6 +13,8 @@ import { LcdI2cNode } from './LcdI2cNode.tsx';
 import { LogicGateNode } from './LogicGateNode.tsx';
 import { FlipFlopNode } from './FlipFlopNode.tsx';
 import { ClockNode } from './ClockNode.tsx';
+import { InstrumentNode } from './InstrumentNode.tsx';
+import { JunctionNode } from './JunctionNode.tsx';
 
 export const circuitNodeTypes: NodeTypes = {
   // Passives & Sources
@@ -53,4 +55,12 @@ export const circuitNodeTypes: NodeTypes = {
   // Displays
   OLED_SSD1306: OledNode,
   LCD_I2C: LcdI2cNode,
+
+  // Virtual Test Instruments
+  Voltmeter: InstrumentNode,
+  Ammeter: InstrumentNode,
+  Ohmmeter: InstrumentNode,
+
+  // Connectors / Solder Junctions
+  Junction: JunctionNode,
 };

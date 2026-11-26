@@ -23,7 +23,11 @@ export type ComponentType =
   | 'XNOR'
   | 'D_FlipFlop'
   | 'JK_FlipFlop'
-  | 'Clock';
+  | 'Clock'
+  | 'Voltmeter'
+  | 'Ammeter'
+  | 'Ohmmeter'
+  | 'Junction';
 
 export type HandleOrientation = 'top' | 'bottom' | 'left' | 'right';
 
@@ -40,7 +44,7 @@ export interface ComponentMetadata {
   defaultPrefix: string;
   displayName: string;
   defaultValue?: string;
-  category?: 'passives' | 'microcontrollers' | 'sensors_displays' | 'logic_gates';
+  category?: 'passives' | 'microcontrollers' | 'sensors_displays' | 'logic_gates' | 'instruments';
   pins: PinDefinition[];
 }
 
@@ -390,6 +394,51 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: 'SCL', label: 'SCL', position: 'right', aliases: ['sck'] },
     ],
   },
+  // -------------------------------------------------------------
+  // Virtual Test Instruments
+  // -------------------------------------------------------------
+  Voltmeter: {
+    type: 'Voltmeter',
+    defaultPrefix: 'VM',
+    displayName: 'DC Voltmeter',
+    defaultValue: 'DC V',
+    category: 'instruments',
+    pins: [
+      { id: 'pos', label: '+', position: 'left', aliases: ['+', 'p', '1', 'in'] },
+      { id: 'neg', label: '-', position: 'right', aliases: ['-', 'n', '2', 'gnd'] },
+    ],
+  },
+  Ammeter: {
+    type: 'Ammeter',
+    defaultPrefix: 'AM',
+    displayName: 'DC Ammeter',
+    defaultValue: 'DC A',
+    category: 'instruments',
+    pins: [
+      { id: 'pos', label: '+', position: 'left', aliases: ['+', 'p', '1', 'in'] },
+      { id: 'neg', label: '-', position: 'right', aliases: ['-', 'n', '2', 'out'] },
+    ],
+  },
+  Ohmmeter: {
+    type: 'Ohmmeter',
+    defaultPrefix: 'OM',
+    displayName: 'Ohmmeter',
+    defaultValue: 'Ω',
+    category: 'instruments',
+    pins: [
+      { id: '1', label: '1', position: 'left', aliases: ['a', 'pos', '+'] },
+      { id: '2', label: '2', position: 'right', aliases: ['b', 'neg', '-'] },
+    ],
+  },
+  Junction: {
+    type: 'Junction',
+    defaultPrefix: 'J',
+    displayName: 'Wire Junction',
+    category: 'passives',
+    pins: [
+      { id: '1', label: '1', position: 'left', aliases: ['junction', 'node', 'solder_dot', 'tie'] },
+    ],
+  },
 };
 
 export interface CircuitComponent {
@@ -557,6 +606,28 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     i2c_lcd: 'LCD_I2C',
     liquidcrystal_i2c: 'LCD_I2C',
     lcd1602: 'LCD_I2C',
+
+    // Virtual Test Instruments
+    voltmeter: 'Voltmeter',
+    dc_voltmeter: 'Voltmeter',
+    vmeter: 'Voltmeter',
+    vm: 'Voltmeter',
+
+    ammeter: 'Ammeter',
+    dc_ammeter: 'Ammeter',
+    ameter: 'Ammeter',
+    am: 'Ammeter',
+
+    ohmmeter: 'Ohmmeter',
+    ohm_meter: 'Ohmmeter',
+    resistance_meter: 'Ohmmeter',
+    om: 'Ohmmeter',
+
+    junction: 'Junction',
+    node: 'Junction',
+    solder_dot: 'Junction',
+    tie: 'Junction',
+    j: 'Junction',
   };
 
   return map[cleaned] || null;

@@ -297,7 +297,216 @@ V1.neg -> GND.1`;
 
   console.log('✓ Test 13 Passed: Sequential Logic (D_FlipFlop & JK_FlipFlop) parsed, layouted, and simulated cleanly');
 
-  console.log('--- All 13 Parser, Serializer, Layout, Gate, Closed-Loop & Sequential Tests Passed! ---');
+  // Test 14: Exact DC Modified Nodal Analysis (MNA) Math & Engineering Unit Parser
+  const { parseComponentValue } = await import('./utils/simulation.ts');
+  assert(parseComponentValue('10k', 1000) === 10000, 'Expected 10k -> 10000');
+  assert(parseComponentValue('10k Ohm', 1000) === 10000, 'Expected 10k Ohm -> 10000');
+  assert(parseComponentValue('220', 1000) === 220, 'Expected 220 -> 220');
+  assert(parseComponentValue('4.7M', 1000) === 4700000, 'Expected 4.7M -> 4700000');
+  assert(parseComponentValue('5V', 5) === 5, 'Expected 5V -> 5');
+  assert(parseComponentValue('3.3V', 5) === 3.3, 'Expected 3.3V -> 3.3');
+  assert(Math.abs(parseComponentValue('10uF', 10e-6) - 1e-5) < 1e-12, 'Expected 10uF -> 1e-5');
+  assert(parseComponentValue('Status_LED', 1000) === 1000, 'Expected non-numeric fallback');
+
+  const mnaDividerDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+R1: Resistor (10k)
+R2: Resistor (10k Ohm)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R1.1
+R1.2 -> R2.1
+R2.2 -> GND.1
+V1.neg -> GND.1`;
+
+  const mnaGraph = parseDsl(mnaDividerDsl).graph;
+  const mnaSim = runCircuitSimulation(mnaGraph, {});
+  const vTop = mnaSim.nodeVoltages['V1.pos'];
+  const vMid = mnaSim.nodeVoltages['R1.2'];
+  const vGnd = mnaSim.nodeVoltages['GND.1'];
+  const iR1 = mnaSim.branchCurrents['R1'];
+  const iR2 = mnaSim.branchCurrents['R2'];
+  const iEdgeMid = mnaSim.branchCurrents['R1.2->R2.1'];
+
+  assert(Math.abs(vTop - 5.0) < 1e-6, `Expected V1.pos = 5.0V, got ${vTop}`);
+  assert(Math.abs(vMid - 2.5) < 1e-6, `Expected V_mid = 2.50V, got ${vMid}`);
+  assert(Math.abs(vGnd - 0.0) < 1e-9, `Expected GND.1 = 0.0V, got ${vGnd}`);
+  assert(Math.abs(iR1 - 0.00025) < 1e-7, `Expected I_R1 = 0.00025A (0.25mA), got ${iR1}`);
+  assert(Math.abs(iR2 - 0.00025) < 1e-7, `Expected I_R2 = 0.00025A (0.25mA), got ${iR2}`);
+  assert(Math.abs(iEdgeMid - 0.00025) < 1e-7, `Expected wire current = 0.00025A, got ${iEdgeMid}`);
+  assert(mnaSim.componentResistances['R1'] === 10000, 'Expected R1 resistance = 10000');
+  assert(mnaSim.componentResistances['R2'] === 10000, 'Expected R2 resistance = 10000');
+
+  // Verify reverse-biased LED blocks current in 2-pass MNA
+  const revLedDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+D1: LED (Red)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> D1.cathode
+D1.anode -> GND.1
+V1.neg -> GND.1`;
+  const revLedSim = runCircuitSimulation(parseDsl(revLedDsl).graph, {});
+  assert(revLedSim.ledStates['D1'] === false, 'Expected reverse-biased LED to be OFF');
+  assert(revLedSim.branchCurrents['D1'] <= 0, `Expected reverse LED current <= 0, got ${revLedSim.branchCurrents['D1']}`);
+
+  console.log('✓ Test 14 Passed: Exact DC MNA voltage divider (2.50V, 0.25mA), unit parser, and 2-pass LED check verified');
+
+  // Test 15: Virtual Test Instruments (Voltmeter, Ammeter, Ohmmeter)
+  const vmDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+R1: Resistor (10k)
+R2: Resistor (10k)
+VM1: Voltmeter
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R1.1
+R1.2 -> R2.1
+R2.2 -> GND.1
+V1.neg -> GND.1
+R2.1 -> VM1.pos
+R2.2 -> VM1.neg`;
+
+  const vmParsed = parseDsl(vmDsl);
+  assert(vmParsed.isValid, `Expected vmDsl to be valid, got ${JSON.stringify(vmParsed.diagnostics)}`);
+  const vmSim = runCircuitSimulation(vmParsed.graph, {});
+  const vmReading = vmSim.instrumentReadings['VM1'];
+  assert(vmReading && vmReading.status === 'ok', 'Expected VM1 status ok');
+  assert(vmReading.display === '+2.50 V', `Expected VM1 reading "+2.50 V", got "${vmReading.display}"`);
+
+  const amDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+AM1: Ammeter
+R1: Resistor (10k)
+R2: Resistor (10k)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> AM1.pos
+AM1.neg -> R1.1
+R1.2 -> R2.1
+R2.2 -> GND.1
+V1.neg -> GND.1`;
+
+  const amParsed = parseDsl(amDsl);
+  assert(amParsed.isValid, `Expected amDsl to be valid, got ${JSON.stringify(amParsed.diagnostics)}`);
+  const amSim = runCircuitSimulation(amParsed.graph, {});
+  const amReading = amSim.instrumentReadings['AM1'];
+  assert(amReading && amReading.status === 'ok', 'Expected AM1 status ok');
+  assert(amReading.display === '+250.0 µA', `Expected AM1 reading "+250.0 µA", got "${amReading.display}"`);
+  assert(
+    amReading.rawValue !== null && Math.abs(amReading.rawValue - 0.00025) < 1e-7,
+    `Expected AM1 rawValue ~0.00025 A, got ${amReading.rawValue}`
+  );
+
+  // Ohmmeter across two unpowered 10k resistors in series -> 20.00 kΩ
+  const ohmUnpoweredDsl = `[COMPONENTS]
+R1: Resistor (10k)
+R2: Resistor (10k)
+OM1: Ohmmeter
+
+[CONNECTIONS]
+OM1.1 -> R1.1
+R1.2 -> R2.1
+R2.2 -> OM1.2`;
+  const ohmUnpoweredParsed = parseDsl(ohmUnpoweredDsl);
+  assert(ohmUnpoweredParsed.isValid, 'Expected ohmUnpoweredDsl to be valid');
+  const ohmUnpoweredSim = runCircuitSimulation(ohmUnpoweredParsed.graph, {});
+  const omOk = ohmUnpoweredSim.instrumentReadings['OM1'];
+  assert(omOk && omOk.status === 'ok', `Expected OM1 status ok, got ${omOk?.status}`);
+  assert(omOk.display === '20.00 kΩ', `Expected OM1 reading "20.00 kΩ", got "${omOk.display}"`);
+
+  // Ohmmeter connected to a live 5V source -> live_error
+  const ohmLiveDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+R1: Resistor (10k)
+OM1: Ohmmeter
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R1.1
+R1.2 -> GND.1
+V1.neg -> GND.1
+R1.1 -> OM1.1
+R1.2 -> OM1.2`;
+  const ohmLiveSim = runCircuitSimulation(parseDsl(ohmLiveDsl).graph, {});
+  const omLive = ohmLiveSim.instrumentReadings['OM1'];
+  assert(omLive && omLive.status === 'live_error', `Expected OM1 status live_error, got ${omLive?.status}`);
+  assert(omLive.display === 'ERR / LIVE', `Expected OM1 display "ERR / LIVE", got "${omLive?.display}"`);
+
+  console.log('✓ Test 15 Passed: Virtual Test Instruments (Voltmeter +2.50 V, Ammeter +250.0 µA, Ohmmeter 20.00 kΩ & live_error) verified');
+
+  // Test 16: Proteus-Style Wire-to-Wire Junctions & branchFromEdge
+  const branchBaseDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+R1: Resistor (10k)
+R2: Resistor (10k)
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R1.1
+R1.2 -> GND.1
+V1.neg -> GND.1`;
+
+  await useCircuitStore.getState().setDslText(branchBaseDsl);
+  const targetEdgeId = 'V1.pos->R1.1';
+  const jId = useCircuitStore.getState().branchFromEdge(targetEdgeId, { x: 155, y: 99 });
+  assert(jId === 'J1', `Expected first junction ID "J1", got "${jId}"`);
+
+  const branchedState = useCircuitStore.getState();
+  const jComp = branchedState.graph.components.find((c) => c.id === 'J1');
+  assert(Boolean(jComp && jComp.type === 'Junction'), 'Expected J1 Junction component in graph');
+  assert(jComp!.position.x === 160 && jComp!.position.y === 96, `Expected 16px-snapped position (160, 96), got (${jComp!.position.x}, ${jComp!.position.y})`);
+  assert(branchedState.dslText.includes('J1: Junction'), 'Expected "J1: Junction" in serialized DSL');
+  assert(
+    branchedState.graph.connections.some((c) => c.sourceComponentId === 'V1' && c.targetComponentId === 'J1' && c.targetPinId === '1'),
+    'Expected V1.pos -> J1.1 connection'
+  );
+  assert(
+    branchedState.graph.connections.some((c) => c.sourceComponentId === 'J1' && c.sourcePinId === '1' && c.targetComponentId === 'R1'),
+    'Expected J1.1 -> R1.1 connection'
+  );
+
+  // Wire R2 in parallel from J1.1 to GND.1 and verify MNA merges J1.1 into the 5V net
+  const parallelJunctionDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+AM1: Ammeter
+J1: Junction
+R1: Resistor (10k)
+R2: Resistor (10k)
+VM1: Voltmeter
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> AM1.pos
+AM1.neg -> J1.1
+J1.1 -> R1.1
+J1.1 -> R2.1
+R1.2 -> GND.1
+R2.2 -> GND.1
+J1.1 -> VM1.pos
+GND.1 -> VM1.neg
+V1.neg -> GND.1`;
+
+  const pjParsed = parseDsl(parallelJunctionDsl);
+  assert(pjParsed.isValid, `Expected parallelJunctionDsl to be valid, got ${JSON.stringify(pjParsed.diagnostics)}`);
+  const pjRoundTrip = parseDsl(serializeGraph(pjParsed.graph));
+  assert(pjRoundTrip.isValid && pjRoundTrip.graph.connections.length === 9, 'Expected Junction DSL round-trip to preserve all 9 connections');
+
+  const pjLayout = await calculateAutoLayout(pjParsed.graph);
+  assert(Boolean(pjLayout['J1']), 'Expected ELKjs auto-layout to position J1');
+
+  const pjSim = runCircuitSimulation(pjParsed.graph, {});
+  assert(Math.abs(pjSim.nodeVoltages['J1.1'] - 5.0) < 1e-3, `Expected J1.1 = 5.0V, got ${pjSim.nodeVoltages['J1.1']}`);
+  assert(pjSim.instrumentReadings['VM1']?.display === '+5.00 V', `Expected VM1 "+5.00 V", got "${pjSim.instrumentReadings['VM1']?.display}"`);
+  assert(pjSim.instrumentReadings['AM1']?.display === '+1.00 mA', `Expected AM1 "+1.00 mA" for two parallel 10k resistors, got "${pjSim.instrumentReadings['AM1']?.display}"`);
+
+  console.log('✓ Test 16 Passed: Wire-to-wire Junctions (branchFromEdge, DSL round-trip, ELKjs layout, and MNA parallel split) verified');
+
+  console.log('--- All 16 Parser, Serializer, Layout, Gate, Closed-Loop, Sequential, MNA, Instrument & Junction Tests Passed! ---');
 }
 
 runTests();

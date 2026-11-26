@@ -95,6 +95,10 @@ function compareComponents(a: CircuitComponent, b: CircuitComponent): number {
     SHT31: 10,
     OLED_SSD1306: 11,
     LCD_I2C: 11.5,
+    Junction: 11.6,
+    Voltmeter: 11.7,
+    Ammeter: 11.8,
+    Ohmmeter: 11.9,
     Ground: 12,
   };
 

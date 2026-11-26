@@ -88,16 +88,29 @@ export const App: React.FC = () => {
         className="flex-1 w-full min-h-0 flex overflow-hidden relative"
         style={{ height: '100%' }}
       >
-        {/* Left: Interactive Canvas View + Component Palette */}
-        <section
-          className={`relative h-full min-w-0 min-h-0 bg-slate-950 overflow-hidden flex-1 ${mobileTab !== 'canvas' ? 'hidden md:flex' : ''}`}
-          style={{ height: '100%' }}
-        >
-          {!leftPanelCollapsed && (
+        {/* Left Sidebar: Component Library (Desktop flex sidebar) */}
+        {!leftPanelCollapsed && (
+          <div className="hidden md:flex h-full min-h-0 shrink-0">
             <ComponentPalette
               collapsed={leftPanelCollapsed}
               onToggleCollapse={() => setLeftPanelCollapsed(true)}
             />
+          </div>
+        )}
+
+        {/* Center: Interactive Canvas View + Environment Panel */}
+        <section
+          className={`relative h-full min-w-0 min-h-0 bg-slate-950 overflow-hidden flex-1 ${mobileTab !== 'canvas' ? 'hidden md:flex' : ''}`}
+          style={{ height: '100%' }}
+        >
+          {/* Mobile Component Library Drawer Trigger */}
+          {!leftPanelCollapsed && (
+            <div className="md:hidden">
+              <ComponentPalette
+                collapsed={leftPanelCollapsed}
+                onToggleCollapse={() => setLeftPanelCollapsed(true)}
+              />
+            </div>
           )}
           <CircuitCanvas
             nodes={nodes}
@@ -113,7 +126,7 @@ export const App: React.FC = () => {
           {leftPanelCollapsed && (
             <button
               onClick={() => setLeftPanelCollapsed(false)}
-              className="absolute top-3 left-3 z-50 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/95 border border-slate-700 text-sky-400 text-xs font-semibold shadow-2xl backdrop-blur-md"
+              className="hidden md:flex absolute top-3 left-3 z-50 items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/95 border border-slate-700 text-sky-400 text-xs font-semibold shadow-2xl backdrop-blur-md"
             >
               <ChevronRight className="w-3.5 h-3.5" />
               <span className="text-[10px] font-medium">Components</span>

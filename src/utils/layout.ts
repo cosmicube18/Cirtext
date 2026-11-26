@@ -47,7 +47,12 @@ export async function calculateAutoLayout(
       case 'JK_FlipFlop':
         return { width: 180, height: 150 };
       case 'Clock':
+      case 'Voltmeter':
+      case 'Ammeter':
+      case 'Ohmmeter':
         return { width: 150, height: 110 };
+      case 'Junction':
+        return { width: 16, height: 16 };
       case 'VoltageSource':
       case 'Resistor':
       case 'Capacitor':

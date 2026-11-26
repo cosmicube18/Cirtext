@@ -50,6 +50,7 @@ export interface CircuitState {
   updateEdges: (edges: CircuitEdge[]) => void;
   connectPins: (connection: Connection) => void;
   addComponent: (type: ComponentType, position?: { x: number; y: number }) => void;
+  branchFromEdge: (edgeId: string, clickPosition: { x: number; y: number }) => string;
   deleteComponent: (id: string) => void;
   deleteNodes: (nodesToDelete: CircuitNode[] | string[]) => void;
   deleteEdges: (edgesToDelete: CircuitEdge[] | string[]) => void;
@@ -470,6 +471,80 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     });
   },
 
+  branchFromEdge: (edgeId: string, clickPosition: { x: number; y: number }) => {
+    const currentGraph = get().graph;
+    const targetConn = currentGraph.connections.find((c) => c.id === edgeId);
+    if (!targetConn) return '';
+
+    get()._pushHistory();
+
+    let nextNum = 1;
+    while (currentGraph.components.some((c) => c.id === `J${nextNum}`)) {
+      nextNum++;
+    }
+    const junctionId = `J${nextNum}`;
+    const snappedPos = {
+      x: Math.round(clickPosition.x / 16) * 16,
+      y: Math.round(clickPosition.y / 16) * 16,
+    };
+
+    const junctionComp = {
+      id: junctionId,
+      type: 'Junction' as const,
+      position: snappedPos,
+      rotation: 0 as const,
+    };
+
+    const seg1 = {
+      id: `${targetConn.sourceComponentId}.${targetConn.sourcePinId}->${junctionId}.1`,
+      sourceComponentId: targetConn.sourceComponentId,
+      sourcePinId: targetConn.sourcePinId,
+      targetComponentId: junctionId,
+      targetPinId: '1',
+      netLabel: targetConn.netLabel,
+    };
+    const seg2 = {
+      id: `${junctionId}.1->${targetConn.targetComponentId}.${targetConn.targetPinId}`,
+      sourceComponentId: junctionId,
+      sourcePinId: '1',
+      targetComponentId: targetConn.targetComponentId,
+      targetPinId: targetConn.targetPinId,
+    };
+
+    const updatedConnections = currentGraph.connections.flatMap((c) =>
+      c.id === edgeId ? [seg1, seg2] : [c]
+    );
+
+    const updatedGraph: CircuitGraph = {
+      ...currentGraph,
+      components: [...currentGraph.components, junctionComp],
+      connections: updatedConnections,
+    };
+
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(
+      updatedGraph,
+      get().switchStates,
+      get().flipFlopStates,
+      get().clockHigh,
+      get().esp32GpioStates
+    );
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
+    const newDsl = serializeGraph(updatedGraph);
+
+    set({
+      graph: updatedGraph,
+      nodes,
+      edges,
+      dslText: newDsl,
+      simulationState: simResult,
+      flipFlopStates: simResult.flipFlopStates,
+      lastUpdatedBy: 'canvas',
+    });
+
+    return junctionId;
+  },
+
   addComponent: (type: ComponentType, position?: { x: number; y: number }) => {
     get()._pushHistory();
     const currentGraph = get().graph;
@@ -666,7 +741,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes: [],
       edges: [],
       diagnostics: [],
-      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, buzzerStates: {}, edgeStates: {}, flipFlopStates: {}, i2cDevices: {} },
+      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, buzzerStates: {}, edgeStates: {}, flipFlopStates: {}, i2cDevices: {}, nodeVoltages: {}, branchCurrents: {}, componentResistances: {}, overCurrent: {}, instrumentReadings: {} },
       flipFlopStates: {},
       lcdDisplays: {},
       lastUpdatedBy: 'canvas',
