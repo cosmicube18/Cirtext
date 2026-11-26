@@ -23,6 +23,15 @@ Here are the strict syntax rules:
     - Sequential Logic (Flip-Flops):
         - D_FlipFlop: inputs "D", "CLK", outputs "Q", "Q_BAR" (e.g. FF1: D_FlipFlop)
         - JK_FlipFlop: inputs "J", "CLK", "K", outputs "Q", "Q_BAR" (e.g. FF1: JK_FlipFlop)
+        EDGE TRIGGERING (critical for counters):
+        - D_FlipFlop is POSITIVE-edge triggered (latches on CLK rising edge 0 -> 1), like a 74LS74.
+        - JK_FlipFlop is NEGATIVE-edge triggered (latches on CLK falling edge 1 -> 0), like a 74LS73/74LS76.
+        RIPPLE COUNTER WIRING (always count UP: 0 -> 1 -> 2 -> 3 ...):
+        - With J = K = 1 (or J = Q_BAR, K = Q) on every stage, chain each stage's clock from the previous stage's output:
+          * JK_FlipFlop stages (negative-edge): wire the previous stage's Q to the next stage's CLK to count UP.
+            Wiring Q_BAR instead would make it count DOWN.
+          * D_FlipFlop stages (positive-edge): wire the previous stage's Q_BAR to the next stage's CLK to count UP.
+            Wiring Q instead would make it count DOWN.
     - Clock Generators:
         - Clock: output "OUT" (e.g. CLK1: Clock)
    - ESP32_30Pin:

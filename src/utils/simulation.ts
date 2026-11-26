@@ -429,7 +429,12 @@ export function runCircuitSimulation(
         }
       }
 
-      // Sequential Logic Evaluation (D_FlipFlop, JK_FlipFlop) with rising-edge detection
+      // Sequential Logic Evaluation (D_FlipFlop, JK_FlipFlop) with edge detection.
+      // Edge polarity matches standard 74xx parts:
+      //   - D_FlipFlop  (e.g. 74LS74): POSITIVE-edge, latches on CLK 0 -> 1.
+      //   - JK_FlipFlop (e.g. 74LS73/74LS76): NEGATIVE-edge, latches on CLK 1 -> 0.
+      // The negative-edge JK is what makes a ripple counter wired Q -> CLK of the
+      // next stage (with J = K = 1) count UP (0, 1, 2, 3, ...).
       if (comp.type === 'D_FlipFlop' || comp.type === 'JK_FlipFlop') {
         const compId = comp.id;
         const currClk = (pinStates[`${compId}.CLK`] ?? 0) === 1;
@@ -440,26 +445,26 @@ export function runCircuitSimulation(
         }
         const ffState = flipFlopStates[compId];
 
-        // Rising edge detection: CLK went from LOW to HIGH
+        // Rising edge: CLK went from LOW to HIGH (D flip-flop active edge)
         const risingEdge = !ffState.prevClk && currClk;
+        // Falling edge: CLK went from HIGH to LOW (JK flip-flop active edge)
+        const fallingEdge = ffState.prevClk && !currClk;
 
-        if (risingEdge) {
-          if (comp.type === 'D_FlipFlop') {
-            const inD = pinStates[`${compId}.D`] ?? 0;
-            ffState.q = inD === 1;
-          } else if (comp.type === 'JK_FlipFlop') {
-            const inJ = pinStates[`${compId}.J`] ?? 0;
-            const inK = pinStates[`${compId}.K`] ?? 0;
+        if (comp.type === 'D_FlipFlop' && risingEdge) {
+          const inD = pinStates[`${compId}.D`] ?? 0;
+          ffState.q = inD === 1;
+        } else if (comp.type === 'JK_FlipFlop' && fallingEdge) {
+          const inJ = pinStates[`${compId}.J`] ?? 0;
+          const inK = pinStates[`${compId}.K`] ?? 0;
 
-            if (inJ === 0 && inK === 0) {
-              // Hold: q stays the same
-            } else if (inJ === 0 && inK === 1) {
-              ffState.q = false; // Reset
-            } else if (inJ === 1 && inK === 0) {
-              ffState.q = true; // Set
-            } else if (inJ === 1 && inK === 1) {
-              ffState.q = !ffState.q; // Toggle
-            }
+          if (inJ === 0 && inK === 0) {
+            // Hold: q stays the same
+          } else if (inJ === 0 && inK === 1) {
+            ffState.q = false; // Reset
+          } else if (inJ === 1 && inK === 0) {
+            ffState.q = true; // Set
+          } else if (inJ === 1 && inK === 1) {
+            ffState.q = !ffState.q; // Toggle
           }
         }
 

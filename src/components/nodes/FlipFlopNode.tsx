@@ -84,8 +84,10 @@ export const FlipFlopNode: React.FC<NodeProps> = (props) => {
                   style={{ left: '-18px' }}
                   className="!w-2.5 !h-2.5 !border-2 !border-sky-400 !bg-slate-950 hover:!bg-sky-400 hover:!scale-125 transition-all"
                 />
-                <svg width="10" height="12" viewBox="0 0 10 12" className="stroke-sky-400 fill-none stroke-[1.8]">
-                  <polyline points="0,1 8,6 0,11" />
+                <svg width="15" height="12" viewBox="0 0 15 12" className="stroke-sky-400 fill-none stroke-[1.8]">
+                  {/* Negative-edge (falling-edge) clock: inversion bubble + wedge, per 74LS73/74LS76 */}
+                  <circle cx="2.5" cy="6" r="2.5" />
+                  <polyline points="6,1 14,6 6,11" />
                 </svg>
                 <span className="text-[10px] font-mono font-bold text-slate-300">CLK</span>
                 {isSimulating && (

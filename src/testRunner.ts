@@ -275,22 +275,25 @@ V1.neg -> GND.1`;
   assert(simInit.pinStates['FF1.Q'] === 0, 'Expected FF1.Q to be 0 initially');
   assert(simInit.pinStates['FF1.Q_BAR'] === 1, 'Expected FF1.Q_BAR to be 1 initially');
 
-  // 2. Rising edge #1: CLK 0->1 (SW_CLK closes). FF1 latches D=1.
+  // 2. Rising edge #1: CLK 0->1 (SW_CLK closes). FF1 (positive-edge) latches D=1.
+  //    FF2 is a negative-edge JK flip-flop, so it does NOT trigger on a rising edge.
   const simPulse1 = runCircuitSimulation(ffResult.graph, { SW_D: true, SW_CLK: true }, flipFlopStates);
   assert(simPulse1.pinStates['FF1.Q'] === 1, 'Expected FF1.Q to latch to 1 on first rising edge');
   assert(simPulse1.pinStates['FF1.Q_BAR'] === 0, 'Expected FF1.Q_BAR to be 0');
-  // FF2 sees J=0 (old FF1.Q), K=1 on first edge -> holds/reset
-  assert(simPulse1.pinStates['FF2.Q'] === 0, 'Expected FF2.Q to remain 0 after first edge');
+  assert(simPulse1.pinStates['FF2.Q'] === 0, 'Expected FF2.Q to remain 0 on a rising edge (JK is negative-edge)');
 
-  // 3. Falling edge: CLK 1->0 (SW_CLK opens). No state change.
+  // 3. Falling edge: CLK 1->0 (SW_CLK opens). FF1 (positive-edge) holds.
+  //    FF2 (negative-edge) triggers: it now sees J=1 (FF1.Q), K=0 -> SET.
   const simFall = runCircuitSimulation(ffResult.graph, { SW_D: true, SW_CLK: false }, flipFlopStates);
   assert(simFall.pinStates['FF1.Q'] === 1, 'Expected FF1.Q to hold on falling edge');
-  assert(simFall.pinStates['FF2.Q'] === 0, 'Expected FF2.Q to hold on falling edge');
+  assert(simFall.pinStates['FF2.Q'] === 1, 'Expected FF2.Q to be Set to 1 on the falling edge (JK negative-edge)');
+  assert(simFall.ledStates['D_Out'] === true, 'Expected D_Out LED to be lit');
 
-  // 4. Rising edge #2: CLK 0->1 (SW_CLK closes again). FF2 now sees J=1 (FF1.Q), K=0 -> SET
+  // 4. Rising edge #2: CLK 0->1 (SW_CLK closes again). Neither flip-flop changes:
+  //    FF1 holds (D still 1), FF2 (negative-edge) does not trigger on a rising edge.
   const simPulse2 = runCircuitSimulation(ffResult.graph, { SW_D: true, SW_CLK: true }, flipFlopStates);
-  assert(simPulse2.pinStates['FF2.Q'] === 1, 'Expected FF2.Q to be Set to 1 on second rising edge');
-  assert(simPulse2.ledStates['D_Out'] === true, 'Expected D_Out LED to be lit');
+  assert(simPulse2.pinStates['FF2.Q'] === 1, 'Expected FF2.Q to hold 1 on a rising edge (JK negative-edge)');
+  assert(simPulse2.ledStates['D_Out'] === true, 'Expected D_Out LED to stay lit');
 
   console.log('✓ Test 13 Passed: Sequential Logic (D_FlipFlop & JK_FlipFlop) parsed, layouted, and simulated cleanly');
 
