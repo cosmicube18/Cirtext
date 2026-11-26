@@ -61,16 +61,6 @@ export const WireEdge: React.FC<EdgeProps> = ({
         labelBgStyle={labelBgStyle}
         labelBgPadding={labelBgPadding}
         labelBgBorderRadius={labelBgBorderRadius}
-        interactionWidth={0}
-      />
-
-      {/* Wide invisible hit-target so the thin wire is easy to click and select */}
-      <path
-        d={edgePath}
-        fill="none"
-        stroke="transparent"
-        strokeWidth={7}
-        style={{ pointerEvents: 'all', cursor: 'pointer' }}
       />
     </>
   );
