@@ -76,7 +76,7 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ onClose }) =
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hello! I'm your OpenRouter AI Circuit Assistant. Describe any circuit or modification in plain English, and I will automatically build and layout your schematic!",
+        "Hello! I'm your AI Circuit Assistant. Describe any circuit or modification in plain English, and I will automatically build and layout your schematic!",
     },
   ]);
 
@@ -271,7 +271,7 @@ ${currentDsl.trim()}
             <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
               AI Circuit Assistant
               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800">
-                Gemini 3.1 Flash Lite
+                Powered by Nvidia Nemotron Super
               </span>
             </h3>
             <p className="text-[10px] text-slate-400">Natural Language to Circuit Diagram</p>
@@ -373,7 +373,7 @@ ${currentDsl.trim()}
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-xl rounded-tl-none p-3 text-xs text-slate-400 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-              <span>Gemini 3.1 Flash Lite is designing your circuit...</span>
+              <span>Nemotron is designing your circuit...</span>
             </div>
           </div>
         )}
