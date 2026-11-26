@@ -25,12 +25,39 @@ interface SerialOutMessage {
   text: string;
 }
 
+interface LcdUpdateMessage {
+  type: 'LCD_UPDATE';
+  address: number;
+  row0: string;
+  row1: string;
+  backlight: boolean;
+}
+
 interface CompileErrorMessage {
   type: 'COMPILE_ERROR';
   error: string;
 }
 
-type WorkerResponse = CompiledMessage | PinWriteMessage | PinToneMessage | SerialOutMessage | CompileErrorMessage;
+type WorkerResponse =
+  | CompiledMessage
+  | PinWriteMessage
+  | PinToneMessage
+  | SerialOutMessage
+  | LcdUpdateMessage
+  | CompileErrorMessage;
+
+export interface I2cDeviceDescriptor {
+  address: number;
+  type: string;
+  online: boolean;
+}
+
+export interface EnvironmentValues {
+  temperature: number;
+  humidity: number;
+  lightLux: number;
+  co2Ppm: number;
+}
 
 interface Esp32PinState {
   gpio: number;
@@ -48,7 +75,13 @@ export class Esp32RuntimeManager {
   private onSerialOutput: ((text: string) => void) | null = null;
   private onPinUpdate: ((gpio: number, value: number) => void) | null = null;
   private onToneUpdate: ((gpio: number, frequencyHz: number) => void) | null = null;
+  private onLcdUpdate: ((address: number, row0: string, row1: string, backlight: boolean) => void) | null = null;
   private onSimulationTrigger: (gpioStates: Esp32GpioStates) => void = () => {};
+  private lastI2cSync: {
+    type: 'I2C_BUS_SYNC';
+    devices: I2cDeviceDescriptor[];
+    env: EnvironmentValues;
+  } | null = null;
   private compilePromise: Promise<{ success: boolean; errors?: string }> | null = null;
   private compileResolve: ((value: { success: boolean; errors?: string }) => void) | null = null;
   private autoRunRequested = false;
@@ -69,6 +102,10 @@ export class Esp32RuntimeManager {
 
   setToneUpdateCallback(callback: (gpio: number, frequencyHz: number) => void) {
     this.onToneUpdate = callback;
+  }
+
+  setLcdUpdateCallback(callback: (address: number, row0: string, row1: string, backlight: boolean) => void) {
+    this.onLcdUpdate = callback;
   }
 
   setSimulationTrigger(callback: (gpioStates: Esp32GpioStates) => void) {
@@ -139,10 +176,18 @@ export class Esp32RuntimeManager {
           this.handlePinTone(message.gpio, message.frequencyHz);
         } else if (message.type === 'SERIAL_OUT') {
           this.handleSerialOut(message.text);
+        } else if (message.type === 'LCD_UPDATE') {
+          this.handleLcdUpdate(message);
         }
       };
 
       this.worker!.postMessage(autoRun ? { type: 'COMPILE_AND_RUN', code } : { type: 'COMPILE', code });
+
+      // Re-send the latest I2C bus state so the freshly created worker knows
+      // which devices are online before the sketch's setup() runs.
+      if (this.lastI2cSync) {
+        this.worker!.postMessage(this.lastI2cSync);
+      }
     });
   }
 
@@ -205,6 +250,40 @@ export class Esp32RuntimeManager {
     this.serialBuffer.push(text);
     if (this.onSerialOutput) {
       this.onSerialOutput(text);
+    }
+  }
+
+  private handleLcdUpdate(message: LcdUpdateMessage): void {
+    if (this.onLcdUpdate) {
+      this.onLcdUpdate(message.address, message.row0, message.row1, message.backlight);
+    }
+  }
+
+  /**
+   * Pushes the strict I2C bus table (which devices are actually powered + wired to
+   * GPIO21/GPIO22) and the simulated environment values into the WASM worker so
+   * `Wire`/`LiquidCrystal_I2C`/sensor helpers see the correct live state.
+   */
+  syncI2cBus(simulationResult: SimulationResult, environment: EnvironmentValues): void {
+    const devices: I2cDeviceDescriptor[] = Object.values(simulationResult.i2cDevices).map((d) => ({
+      address: d.address,
+      type: d.type,
+      online: d.online,
+    }));
+
+    this.lastI2cSync = {
+      type: 'I2C_BUS_SYNC',
+      devices,
+      env: {
+        temperature: environment.temperature,
+        humidity: environment.humidity,
+        lightLux: environment.lightLux,
+        co2Ppm: environment.co2Ppm,
+      },
+    };
+
+    if (this.worker) {
+      this.worker.postMessage(this.lastI2cSync);
     }
   }
 

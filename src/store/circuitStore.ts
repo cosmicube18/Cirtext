@@ -12,7 +12,7 @@ import { parseDsl } from '../parser/dslParser.ts';
 import { serializeGraph } from '../parser/dslSerializer.ts';
 import { SAMPLE_CIRCUITS, type CircuitSample } from '../parser/sampleCircuits.ts';
 import { calculateAutoLayout } from '../utils/layout.ts';
-import { runCircuitSimulation, type SimulationResult, type FlipFlopStates, type Esp32GpioStates } from '../utils/simulation.ts';
+import { runCircuitSimulation, I2C_ADDRESSES, type SimulationResult, type FlipFlopStates, type Esp32GpioStates } from '../utils/simulation.ts';
 import { esp32RuntimeManager } from '../simulation/esp32/Esp32RuntimeManager.ts';
 
 export interface CircuitState {
@@ -33,6 +33,11 @@ export interface CircuitState {
   simulationState: SimulationResult;
   esp32GpioStates: Esp32GpioStates; // ESP32 componentId -> pinId -> 0|1
 
+  // Simulated environment values that Phase 2 sliders can drive directly.
+  environmentState: EnvironmentState;
+  // Rendered 16x2 text state for each LCD_I2C, keyed by component id.
+  lcdDisplays: Record<string, LcdDisplayState>;
+
   // Actions
   setDslText: (text: string) => Promise<void>;
   updateNodes: (nodes: CircuitNode[]) => void;
@@ -50,8 +55,30 @@ export interface CircuitState {
   toggleSimulation: () => void;
   toggleSwitch: (switchId: string) => void;
   setEsp32GpioStates: (gpioStates: Esp32GpioStates) => void;
+  setEnvironmentState: (partial: Partial<EnvironmentState>) => void;
+  setLcdDisplayByAddress: (address: number, display: LcdDisplayState) => void;
   _recomputeSimulation: () => void;
 }
+
+export interface EnvironmentState {
+  temperature: number; // degrees Celsius
+  humidity: number; // percent relative humidity
+  lightLux: number; // ambient light in lux
+  co2Ppm: number; // CO2 concentration in ppm
+}
+
+export interface LcdDisplayState {
+  row0: string;
+  row1: string;
+  backlight: boolean;
+}
+
+const DEFAULT_ENVIRONMENT: EnvironmentState = {
+  temperature: 25.0,
+  humidity: 50.0,
+  lightLux: 350,
+  co2Ppm: 420,
+};
 
 function graphToNodesAndEdges(
   graph: CircuitGraph,
@@ -160,6 +187,8 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   flipFlopStates: {},
   simulationState: initialSimResult,
   esp32GpioStates: initialEsp32GpioStates,
+  environmentState: { ...DEFAULT_ENVIRONMENT },
+  lcdDisplays: {},
 
   // Helper to recompute simulation with current state
   _recomputeSimulation: () => {
@@ -184,6 +213,21 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     set({ esp32GpioStates: gpioStates }, false);
     // Trigger immediate re-simulation
     get()._recomputeSimulation();
+  },
+
+  setEnvironmentState: (partial: Partial<EnvironmentState>) => {
+    set({ environmentState: { ...get().environmentState, ...partial } });
+  },
+
+  setLcdDisplayByAddress: (address: number, display: LcdDisplayState) => {
+    const graph = get().graph;
+    const lcdComp = graph.components.find(
+      (c) => c.type === 'LCD_I2C' && I2C_ADDRESSES.LCD_I2C === address
+    );
+    if (!lcdComp) return;
+    set({
+      lcdDisplays: { ...get().lcdDisplays, [lcdComp.id]: display },
+    });
   },
 
   setDslText: async (newText: string) => {
@@ -519,8 +563,9 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       nodes: [],
       edges: [],
       diagnostics: [],
-      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, buzzerStates: {}, edgeStates: {}, flipFlopStates: {} },
+      simulationState: { pinStates: {}, isGrounded: {}, ledStates: {}, buzzerStates: {}, edgeStates: {}, flipFlopStates: {}, i2cDevices: {} },
       flipFlopStates: {},
+      lcdDisplays: {},
       lastUpdatedBy: 'canvas',
     });
   },
@@ -602,4 +647,10 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
 // ESP32 code modal lifecycle (closing the modal must never disconnect GPIO updates).
 esp32RuntimeManager.setSimulationTrigger((gpioStates) => {
   useCircuitStore.getState().setEsp32GpioStates(gpioStates);
+});
+
+// Bridge simulated LiquidCrystal_I2C text state into the store so LCD_I2C nodes
+// render exactly what the firmware printed (and stay blank when offline).
+esp32RuntimeManager.setLcdUpdateCallback((address, row0, row1, backlight) => {
+  useCircuitStore.getState().setLcdDisplayByAddress(address, { row0, row1, backlight });
 });

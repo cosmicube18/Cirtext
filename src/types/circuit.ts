@@ -13,6 +13,7 @@ export type ComponentType =
   | 'BH1750'
   | 'SHT31'
   | 'OLED_SSD1306'
+  | 'LCD_I2C'
   | 'AND'
   | 'OR'
   | 'NOR'
@@ -376,6 +377,19 @@ export const COMPONENT_METADATA: Record<ComponentType, ComponentMetadata> = {
       { id: 'SDA', label: 'SDA', position: 'right', aliases: ['data'] },
     ],
   },
+  LCD_I2C: {
+    type: 'LCD_I2C',
+    defaultPrefix: 'LCD',
+    displayName: '16x2 I2C LCD',
+    defaultValue: '0x27',
+    category: 'sensors_displays',
+    pins: [
+      { id: 'GND', label: 'GND', position: 'left', aliases: ['ground'] },
+      { id: 'VCC', label: 'VCC', position: 'left', aliases: ['3v3', 'vin', 'vcc', '5v'] },
+      { id: 'SDA', label: 'SDA', position: 'right', aliases: ['data'] },
+      { id: 'SCL', label: 'SCL', position: 'right', aliases: ['sck'] },
+    ],
+  },
 };
 
 export interface CircuitComponent {
@@ -537,6 +551,12 @@ export function normalizeComponentType(typeStr: string): ComponentType | null {
     oled: 'OLED_SSD1306',
     ssd1306: 'OLED_SSD1306',
     display: 'OLED_SSD1306',
+
+    lcd_i2c: 'LCD_I2C',
+    lcd: 'LCD_I2C',
+    i2c_lcd: 'LCD_I2C',
+    liquidcrystal_i2c: 'LCD_I2C',
+    lcd1602: 'LCD_I2C',
   };
 
   return map[cleaned] || null;

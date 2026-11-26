@@ -94,6 +94,7 @@ function compareComponents(a: CircuitComponent, b: CircuitComponent): number {
     BH1750: 9,
     SHT31: 10,
     OLED_SSD1306: 11,
+    LCD_I2C: 11.5,
     Ground: 12,
   };
 

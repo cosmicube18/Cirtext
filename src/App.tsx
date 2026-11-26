@@ -3,6 +3,7 @@ import { Cpu, FileCode, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react
 import { Navbar } from './components/layout/Navbar.tsx';
 import { ComponentPalette } from './components/layout/ComponentPalette.tsx';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas.tsx';
+import { EnvironmentPanel } from './components/canvas/EnvironmentPanel.tsx';
 import { TextEditor } from './components/editor/TextEditor.tsx';
 import { AiAssistantPanel } from './components/editor/AiAssistantPanel.tsx';
 import { AIPromptModal } from './components/editor/AIPromptModal.tsx';
@@ -108,6 +109,7 @@ export const App: React.FC = () => {
             onEdgesDelete={deleteEdges}
             onOpenEsp32Code={handleOpenEsp32Code}
           />
+          <EnvironmentPanel />
           {leftPanelCollapsed && (
             <button
               onClick={() => setLeftPanelCollapsed(false)}

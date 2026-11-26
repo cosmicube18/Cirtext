@@ -33,6 +33,7 @@ export async function calculateAutoLayout(
       case 'SCD41':
       case 'BH1750':
       case 'SHT31':
+      case 'LCD_I2C':
         return { width: 240, height: 200 };
       case 'AND':
       case 'OR':

@@ -11,6 +11,29 @@ export type FlipFlopStates = Record<string, FlipFlopState>;
 // ESP32 GPIO states: componentId -> pinId -> 0 | 1
 export type Esp32GpioStates = Record<string, Record<string, 0 | 1>>;
 
+export type I2cDeviceType = 'SHT31' | 'BH1750' | 'SCD41' | 'LCD_I2C';
+
+/**
+ * Strict electrical + I2C bus validity for an I2C device.
+ * `online` is true ONLY when VCC sits on a live power rail, GND is grounded,
+ * and SDA/SCL are wired to the ESP32 I2C pins (GPIO21/GPIO22).
+ */
+export interface I2cDeviceState {
+  componentId: string;
+  type: I2cDeviceType;
+  address: number;
+  powered: boolean;
+  wired: boolean;
+  online: boolean;
+}
+
+export const I2C_ADDRESSES: Record<I2cDeviceType, number> = {
+  SHT31: 0x44,
+  BH1750: 0x23,
+  SCD41: 0x62,
+  LCD_I2C: 0x27,
+};
+
 export interface SimulationResult {
   pinStates: Record<string, 0 | 1>;
   isGrounded: Record<string, boolean>;
@@ -18,6 +41,7 @@ export interface SimulationResult {
   buzzerStates: Record<string, boolean>;
   edgeStates: Record<string, 0 | 1>;
   flipFlopStates: FlipFlopStates;
+  i2cDevices: Record<string, I2cDeviceState>;
 }
 
 /**
@@ -490,6 +514,74 @@ export function runCircuitSimulation(
     edgeStates[conn.id] = isLive;
   }
 
+  // 5. Strict I2C device validation.
+  // A device only comes `online` when its VCC sits on a live power rail, its GND
+  // is grounded, and SDA/SCL reach the ESP32 I2C pins (GPIO21 / GPIO22).
+  const i2cDevices: Record<string, I2cDeviceState> = {};
+  const netAdjacency: Record<string, string[]> = {};
+  const link = (a: string, b: string) => {
+    (netAdjacency[a] ||= []).push(b);
+    (netAdjacency[b] ||= []).push(a);
+  };
+  for (const conn of graph.connections) {
+    link(
+      `${conn.sourceComponentId}.${conn.sourcePinId}`,
+      `${conn.targetComponentId}.${conn.targetPinId}`
+    );
+  }
+  for (const comp of graph.components) {
+    if (comp.type === 'Resistor') {
+      link(`${comp.id}.1`, `${comp.id}.2`);
+    } else if (comp.type === 'Switch' && (switchStates[comp.id] ?? false)) {
+      link(`${comp.id}.1`, `${comp.id}.2`);
+    }
+  }
+
+  const netIdOf = new Map<string, number>();
+  let netCounter = 0;
+  for (const pin of Object.keys(netAdjacency)) {
+    if (netIdOf.has(pin)) continue;
+    const stack = [pin];
+    while (stack.length > 0) {
+      const cur = stack.pop()!;
+      if (netIdOf.has(cur)) continue;
+      netIdOf.set(cur, netCounter);
+      for (const nb of netAdjacency[cur] || []) {
+        if (!netIdOf.has(nb)) stack.push(nb);
+      }
+    }
+    netCounter++;
+  }
+  const sameNet = (a: string, b: string): boolean => {
+    const na = netIdOf.get(a);
+    const nb = netIdOf.get(b);
+    return na !== undefined && nb !== undefined && na === nb;
+  };
+
+  const esp32Comp = graph.components.find((c) => c.type === 'ESP32_30Pin');
+
+  for (const comp of graph.components) {
+    const type = comp.type as I2cDeviceType;
+    const address = (I2C_ADDRESSES as Record<string, number | undefined>)[type];
+    if (address === undefined) continue;
+
+    const vccOk = pinStates[`${comp.id}.VCC`] === 1;
+    const gndOk = Boolean(isGrounded[`${comp.id}.GND`]);
+    const sdaOk = esp32Comp ? sameNet(`${comp.id}.SDA`, `${esp32Comp.id}.GPIO21`) : false;
+    const sclOk = esp32Comp ? sameNet(`${comp.id}.SCL`, `${esp32Comp.id}.GPIO22`) : false;
+    const powered = vccOk && gndOk;
+    const wired = sdaOk && sclOk;
+
+    i2cDevices[comp.id] = {
+      componentId: comp.id,
+      type,
+      address,
+      powered,
+      wired,
+      online: powered && wired,
+    };
+  }
+
   return {
     pinStates,
     isGrounded,
@@ -497,5 +589,6 @@ export function runCircuitSimulation(
     buzzerStates,
     edgeStates,
     flipFlopStates,
+    i2cDevices,
   };
 }

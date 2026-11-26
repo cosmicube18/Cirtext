@@ -24,7 +24,7 @@ const PALETTE_GROUPS: PaletteGroup[] = [
   },
   {
     name: 'Sensors & Displays',
-    items: ['SCD41', 'BH1750', 'SHT31', 'OLED_SSD1306'],
+    items: ['SCD41', 'BH1750', 'SHT31', 'OLED_SSD1306', 'LCD_I2C'],
   },
   {
     name: 'Passives & Controls',

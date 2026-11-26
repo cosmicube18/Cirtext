@@ -69,7 +69,7 @@ export const WireEdge: React.FC<EdgeProps> = ({
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={7}
         style={{ pointerEvents: 'all', cursor: 'pointer' }}
       />
     </>

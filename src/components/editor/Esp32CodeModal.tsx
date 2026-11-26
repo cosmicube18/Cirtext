@@ -44,7 +44,7 @@ export const Esp32CodeModal: React.FC<Esp32CodeModalProps> = ({ isOpen, onClose,
   const [showSerial, setShowSerial] = useState(true);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const serialRef = useRef<HTMLDivElement>(null);
-  const { simulationState } = useCircuitStore();
+  const { simulationState, environmentState } = useCircuitStore();
   const isHydratedRef = useRef(false);
 
   const handleSerialOutput = (text: string) => {
@@ -92,8 +92,12 @@ export const Esp32CodeModal: React.FC<Esp32CodeModalProps> = ({ isOpen, onClose,
         useCircuitStore.getState().graph,
         simulationState
       );
+      esp32RuntimeManager.syncI2cBus(
+        simulationState,
+        useCircuitStore.getState().environmentState
+      );
     }
-  }, [simulationState, isRunning]);
+  }, [simulationState, environmentState, isRunning]);
 
   const handleCompileAndRun = async () => {
     setIsCompiling(true);

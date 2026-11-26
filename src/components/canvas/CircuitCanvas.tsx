@@ -197,6 +197,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         fitView
         snapToGrid={true}
         snapGrid={[16, 16]}
+        interactionWidth={7}
         style={{ width: '100%', height: '100%' }}
         defaultEdgeOptions={{
           type: 'wire',

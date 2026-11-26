@@ -34,6 +34,7 @@ Here are the strict syntax rules:
    - BH1750: pins "VCC", "GND", "SCL", "SDA", "ADDR"
    - SHT31: pins "VCC", "GND", "SCL", "SDA", "ADDR"
    - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
+   - LCD_I2C: pins "GND", "VCC", "SDA", "SCL" (16x2 I2C character LCD at address 0x27)
    - Switch: pins "1", "2"
    - VoltageSource: pins "pos", "neg"
    - Resistor: pins "1", "2"
@@ -271,7 +272,7 @@ ${currentDsl.trim()}
             <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
               AI Circuit Assistant
               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800">
-                Powered by Nvidia Nemotron Super
+                Powered by Nvidia Nemotron
               </span>
             </h3>
             <p className="text-[10px] text-slate-400">Natural Language to Circuit Diagram</p>

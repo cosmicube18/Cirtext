@@ -9,6 +9,7 @@ import { SwitchNode } from './SwitchNode.tsx';
 import { Esp32Node } from './Esp32Node.tsx';
 import { MultiPinModuleNode } from './MultiPinModuleNode.tsx';
 import { OledNode } from './OledNode.tsx';
+import { LcdI2cNode } from './LcdI2cNode.tsx';
 import { LogicGateNode } from './LogicGateNode.tsx';
 import { FlipFlopNode } from './FlipFlopNode.tsx';
 import { ClockNode } from './ClockNode.tsx';
@@ -51,4 +52,5 @@ export const circuitNodeTypes: NodeTypes = {
 
   // Displays
   OLED_SSD1306: OledNode,
+  LCD_I2C: LcdI2cNode,
 };

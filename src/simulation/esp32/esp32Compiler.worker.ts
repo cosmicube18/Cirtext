@@ -55,7 +55,13 @@ interface PinStateSyncMessage {
   analogValue?: number;
 }
 
-type WorkerMessage = CompileMessage | CompileAndRunMessage | RunMessage | StopMessage | PinStateSyncMessage;
+interface I2cBusSyncMessage {
+  type: 'I2C_BUS_SYNC';
+  devices: Array<{ address: number; type: string; online: boolean }>;
+  env: { temperature: number; humidity: number; lightLux: number; co2Ppm: number };
+}
+
+type WorkerMessage = CompileMessage | CompileAndRunMessage | RunMessage | StopMessage | PinStateSyncMessage | I2cBusSyncMessage;
 
 let wasmInstance: WebAssembly.Instance | null = null;
 let wasmMemory: WebAssembly.Memory | null = null;
@@ -114,6 +120,99 @@ function replayQueuedMessages(
   });
 }
 
+// =====================================================================
+// I2C bus simulation state. Devices only ACK when the host has marked them
+// `online` (properly powered and wired to GPIO21/GPIO22). Sensor reads return
+// the live simulated environment values; the LCD is buffered per address.
+// =====================================================================
+interface I2cDeviceInfo {
+  address: number;
+  type: string;
+  online: boolean;
+}
+
+let i2cDevices = new Map<number, I2cDeviceInfo>();
+let envState = { temperature: 25.0, humidity: 50.0, lightLux: 350, co2Ppm: 420 };
+
+let i2cTxAddr = 0;
+let i2cTxBuf: number[] = [];
+let i2cReadBuf: number[] = [];
+let i2cReadPos = 0;
+
+interface LcdBuffer {
+  row0: string[];
+  row1: string[];
+  col: number;
+  row: number;
+  backlight: boolean;
+}
+const lcdBuffers = new Map<number, LcdBuffer>();
+
+function blankRow(): string[] {
+  return new Array(16).fill(' ');
+}
+
+function isDeviceOnline(address: number): boolean {
+  const device = i2cDevices.get(address);
+  return Boolean(device && device.online);
+}
+
+function postLcdUpdate(address: number): void {
+  const buf = lcdBuffers.get(address);
+  if (!buf) return;
+  self.postMessage({
+    type: 'LCD_UPDATE',
+    address,
+    row0: buf.row0.join(''),
+    row1: buf.row1.join(''),
+    backlight: buf.backlight,
+  });
+}
+
+function blankLcd(address: number): void {
+  lcdBuffers.set(address, {
+    row0: blankRow(),
+    row1: blankRow(),
+    col: 0,
+    row: 0,
+    backlight: false,
+  });
+  postLcdUpdate(address);
+}
+
+function ensureLcd(address: number): LcdBuffer {
+  let buf = lcdBuffers.get(address);
+  if (!buf) {
+    buf = { row0: blankRow(), row1: blankRow(), col: 0, row: 0, backlight: false };
+    lcdBuffers.set(address, buf);
+  }
+  return buf;
+}
+
+function generateReadBytes(address: number, len: number): number[] {
+  const device = i2cDevices.get(address);
+  const type = device?.type;
+  const out: number[] = [];
+
+  if (type === 'BH1750') {
+    const lux = Math.max(0, Math.round(envState.lightLux)) & 0xffff;
+    out.push((lux >> 8) & 0xff, lux & 0xff);
+  } else if (type === 'SHT31') {
+    const tRaw = Math.round(((envState.temperature + 45) / 175) * 65535) & 0xffff;
+    const hRaw = Math.round((envState.humidity / 100) * 65535) & 0xffff;
+    out.push((tRaw >> 8) & 0xff, tRaw & 0xff, 0, (hRaw >> 8) & 0xff, hRaw & 0xff, 0);
+  } else if (type === 'SCD41') {
+    const co2 = Math.max(0, Math.round(envState.co2Ppm)) & 0xffff;
+    const tRaw = Math.round(((envState.temperature + 45) / 175) * 65535) & 0xffff;
+    const hRaw = Math.round((envState.humidity / 100) * 65535) & 0xffff;
+    out.push((co2 >> 8) & 0xff, co2 & 0xff, 0, (tRaw >> 8) & 0xff, tRaw & 0xff, 0, (hRaw >> 8) & 0xff, hRaw & 0xff, 0);
+  }
+
+  const result: number[] = [];
+  for (let i = 0; i < len; i++) result.push(out[i] ?? 0);
+  return result;
+}
+
 function createImports() {
   const imports = {
     env: {
@@ -153,6 +252,94 @@ function createImports() {
         if (ms > 0) {
           virtualTimeMs += ms;
         }
+      },
+
+      // ---------------- I2C (Wire) ----------------
+      js_i2c_begin_transmission: (address: number) => {
+        i2cTxAddr = address & 0xff;
+        i2cTxBuf = [];
+      },
+      js_i2c_write: (data: number) => {
+        i2cTxBuf.push(data & 0xff);
+      },
+      js_i2c_end_transmission: (): number => {
+        // Non-zero return means the device did not ACK (missing/miswired).
+        return isDeviceOnline(i2cTxAddr) ? 0 : 2;
+      },
+      js_i2c_request_from: (address: number, len: number): number => {
+        if (!isDeviceOnline(address)) {
+          i2cReadBuf = [];
+          i2cReadPos = 0;
+          return 0;
+        }
+        i2cReadBuf = generateReadBytes(address, Math.max(0, len));
+        i2cReadPos = 0;
+        return i2cReadBuf.length;
+      },
+      js_i2c_read: (): number => {
+        if (i2cReadPos >= i2cReadBuf.length) return 0;
+        return i2cReadBuf[i2cReadPos++];
+      },
+      js_i2c_available: (): number => {
+        return i2cReadBuf.length - i2cReadPos;
+      },
+      js_i2c_device_online: (address: number): number => {
+        return isDeviceOnline(address) ? 1 : 0;
+      },
+      js_sensor_value: (address: number, metric: number): number => {
+        if (!isDeviceOnline(address)) return 0;
+        switch (metric) {
+          case 0: return envState.temperature;
+          case 1: return envState.humidity;
+          case 2: return envState.lightLux;
+          case 3: return envState.co2Ppm;
+          default: return 0;
+        }
+      },
+
+      // ---------------- LiquidCrystal_I2C ----------------
+      js_lcd_init: (address: number) => {
+        if (!isDeviceOnline(address)) return;
+        blankLcd(address);
+      },
+      js_lcd_clear: (address: number) => {
+        if (!isDeviceOnline(address)) return;
+        const buf = ensureLcd(address);
+        buf.row0 = blankRow();
+        buf.row1 = blankRow();
+        buf.col = 0;
+        buf.row = 0;
+        postLcdUpdate(address);
+      },
+      js_lcd_set_cursor: (address: number, col: number, row: number) => {
+        if (!isDeviceOnline(address)) return;
+        const buf = ensureLcd(address);
+        buf.col = col;
+        buf.row = row;
+      },
+      js_lcd_backlight: (address: number, on: number) => {
+        if (!isDeviceOnline(address)) return;
+        const buf = ensureLcd(address);
+        buf.backlight = on !== 0;
+        postLcdUpdate(address);
+      },
+      js_lcd_print: (address: number, ptr: number, len: number) => {
+        if (!isDeviceOnline(address) || !wasmMemory) return;
+        if (ptr < 0 || len < 0) return;
+        if (ptr + len > wasmMemory.buffer.byteLength) return;
+        const buf = ensureLcd(address);
+        const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
+        const text = new TextDecoder().decode(bytes);
+        for (const ch of text) {
+          if (buf.col > 15) {
+            buf.col = 0;
+            buf.row = buf.row === 0 ? 1 : 0;
+          }
+          const rowArr = buf.row === 0 ? buf.row0 : buf.row1;
+          rowArr[buf.col] = ch;
+          buf.col++;
+        }
+        postLcdUpdate(address);
       },
     },
   };
@@ -218,6 +405,24 @@ async function compileAndInstantiate(code: string): Promise<{ success: boolean; 
     'sketch.cpp': fullCode,
     'Arduino.h': ARDUINO_HEADER_CONTENT,
   };
+
+  // Every library header simply pulls in Arduino.h, which already defines the
+  // Wire / LiquidCrystal_I2C / sensor classes. This lets sketches include any of
+  // the common I2C library names without shipping separate implementations.
+  for (const header of [
+    'Wire.h',
+    'LiquidCrystal_I2C.h',
+    'SHT31.h',
+    'Adafruit_SHT31.h',
+    'BH1750.h',
+    'Adafruit_BH1750.h',
+    'SensirionI2CScd4x.h',
+    'SensirionI2CSCD4x.h',
+    'SCD41.h',
+    'Adafruit_Sensor.h',
+  ]) {
+    files[header] = '#include "Arduino.h"\n';
+  }
 
   let sketchObj: Uint8Array | undefined;
   const compileResult = await runTool(
@@ -351,5 +556,19 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   } else if (message.type === 'STOP') {
     stopWasm();
   } else if (message.type === 'PIN_STATE_SYNC') {
+  } else if (message.type === 'I2C_BUS_SYNC') {
+    i2cDevices = new Map();
+    for (const device of message.devices) {
+      i2cDevices.set(device.address, device);
+    }
+    if (message.env) {
+      envState = { ...envState, ...message.env };
+    }
+    // Blank any LCD that is no longer powered/wired.
+    for (const address of lcdBuffers.keys()) {
+      if (!isDeviceOnline(address)) {
+        blankLcd(address);
+      }
+    }
   }
 };

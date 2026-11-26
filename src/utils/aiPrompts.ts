@@ -31,7 +31,8 @@ Here are the strict syntax rules:
    - SCD41: pins "VCC", "GND", "SCL", "SDA"
    - BH1750: pins "VCC", "GND", "SCL", "SDA", "ADDR"
    - SHT31: pins "VCC", "GND", "SCL", "SDA", "ADDR"
-   - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
+    - OLED_SSD1306: pins "VCC", "GND", "SCL", "SDA"
+    - LCD_I2C: pins "GND", "VCC", "SDA", "SCL" (16x2 I2C character LCD at address 0x27)
    - Switch: pins "1", "2"
    - VoltageSource: pins "pos", "neg"
    - Resistor: pins "1", "2"
