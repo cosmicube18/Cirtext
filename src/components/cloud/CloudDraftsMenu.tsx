@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import {
   ChevronDown,
   Cloud,
@@ -41,6 +41,30 @@ function readCurrentCircuit() {
   };
 }
 
+const PENDING_DRAFT_KEY = 'cirtext_pending_draft';
+
+interface PendingDraft {
+  dslText: string;
+  esp32Code: string;
+  nodePositions: NodePositions;
+  autoSave: boolean;
+}
+
+function stashGuestWorkspace(autoSave: boolean): void {
+  try {
+    const { dslText, esp32Code, nodePositions } = readCurrentCircuit();
+    const pending: PendingDraft = {
+      dslText,
+      esp32Code,
+      nodePositions,
+      autoSave,
+    };
+    sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(pending));
+  } catch (err) {
+    console.error('Failed to stash guest workspace:', err);
+  }
+}
+
 export const CloudDraftsMenu: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -58,18 +82,92 @@ export const CloudDraftsMenu: React.FC = () => {
     statusTimer.current = setTimeout(() => setStatusMessage(null), 3500);
   }, []);
 
+  const restorePendingDraft = useCallback(
+    async (session: Session) => {
+      if (!supabase) return;
+
+      let raw: string | null = null;
+      try {
+        raw = sessionStorage.getItem(PENDING_DRAFT_KEY);
+        if (raw === null) return;
+        sessionStorage.removeItem(PENDING_DRAFT_KEY);
+      } catch (err) {
+        console.error('Failed to read pending draft:', err);
+        return;
+      }
+
+      let pending: PendingDraft;
+      try {
+        pending = JSON.parse(raw) as PendingDraft;
+      } catch (err) {
+        console.error('Failed to parse pending draft:', err);
+        return;
+      }
+
+      try {
+        await useCircuitStore.getState().setDslText(pending.dslText ?? '');
+
+        if (pending.nodePositions) {
+          const positions = pending.nodePositions;
+          const currentNodes = useCircuitStore.getState().nodes;
+          const restored = currentNodes.map((node) =>
+            positions[node.id]
+              ? { ...node, position: { ...positions[node.id] } }
+              : node
+          );
+          useCircuitStore.getState().updateNodes(restored);
+        }
+
+        esp32RuntimeManager.setCurrentCode(pending.esp32Code ?? '');
+
+        if (pending.autoSave) {
+          const input = window.prompt('Name this draft:', 'Untitled Circuit');
+          const title =
+            input === null ? 'Untitled Circuit' : input.trim() || 'Untitled Circuit';
+
+          const { data, error } = await supabase
+            .from('circuit_drafts')
+            .insert({
+              user_id: session.user.id,
+              title,
+              dsl_text: pending.dslText ?? '',
+              esp32_code: pending.esp32Code ?? '',
+              node_positions: pending.nodePositions ?? {},
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          setActiveDraftId(data.id);
+          setActiveDraftTitle(data.title);
+          flashStatus('Guest circuit saved');
+        } else {
+          flashStatus('Restored your unsaved circuit');
+        }
+      } catch (err) {
+        console.error('Failed to restore pending draft:', err);
+        flashStatus('Could not restore unsaved circuit');
+      }
+    },
+    [flashStatus]
+  );
+
   useEffect(() => {
     if (!supabase) return;
     let isMounted = true;
 
     void supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) setUser(data.session?.user ?? null);
+      if (!isMounted) return;
+      const session = data.session;
+      setUser(session?.user ?? null);
+      if (session) void restorePendingDraft(session);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
-        if (!session) {
+        if (session) {
+          void restorePendingDraft(session);
+        } else {
           setDrafts([]);
           setDraftsOpen(false);
           setActiveDraftId(null);
@@ -83,15 +181,19 @@ export const CloudDraftsMenu: React.FC = () => {
       subscription.subscription.unsubscribe();
       if (statusTimer.current) clearTimeout(statusTimer.current);
     };
-  }, []);
+  }, [restorePendingDraft]);
 
-  const handleSignIn = useCallback(() => {
+  const beginSignIn = useCallback((autoSave: boolean) => {
     if (!supabase) return;
+    stashGuestWorkspace(autoSave);
     void supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
     });
   }, []);
+
+  const handleSignIn = useCallback(() => beginSignIn(false), [beginSignIn]);
+  const handleGuestSave = useCallback(() => beginSignIn(true), [beginSignIn]);
 
   const handleSignOut = useCallback(() => {
     if (!supabase) return;
@@ -249,15 +351,26 @@ export const CloudDraftsMenu: React.FC = () => {
 
   if (!user) {
     return (
-      <button
-        onClick={handleSignIn}
-        title="Sign in with Google to save drafts to the cloud"
-        className="flex shrink-0 items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-medium transition-colors shadow-sm"
-      >
-        <GoogleIcon className="w-3.5 h-3.5 shrink-0" />
-        <span className="hidden sm:inline">Sign in with Google</span>
-        <span className="sm:hidden">Sign in</span>
-      </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          onClick={handleGuestSave}
+          title="Sign in to save your circuit to the cloud"
+          className="flex shrink-0 items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-sm"
+        >
+          <Save className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden md:inline">Save</span>
+        </button>
+
+        <button
+          onClick={handleSignIn}
+          title="Sign in with Google to save drafts to the cloud"
+          className="flex shrink-0 items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-medium transition-colors shadow-sm"
+        >
+          <GoogleIcon className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">Sign in with Google</span>
+          <span className="sm:hidden">Sign in</span>
+        </button>
+      </div>
     );
   }
 
