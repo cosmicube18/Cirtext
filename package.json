@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "@xyflow/react": "^13.0.2",
     "@yowasp/clang": "^22.0.0-git20695-13",
     "elkjs": "^0.12.1",

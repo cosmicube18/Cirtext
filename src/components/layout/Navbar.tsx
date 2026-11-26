@@ -20,6 +20,7 @@ import {
 import { useCircuitStore } from '../../store/circuitStore.ts';
 import { SAMPLE_CIRCUITS } from '../../parser/sampleCircuits.ts';
 import { downloadDiagram, printDiagram } from '../../utils/exportDiagram.ts';
+import { CloudDraftsMenu } from '../cloud/CloudDraftsMenu.tsx';
 
 export interface NavbarProps {
   onOpenAiPrompt: () => void;
@@ -222,12 +223,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
       </div>
 
       {/* Action Toolbar */}
-      <div className="flex items-center flex-wrap gap-1.5 md:gap-2">
+      <div className="flex items-center flex-wrap justify-end gap-1 md:gap-1.5 min-w-0">
         {/* Real-time Simulation Toggle Button */}
         <button
           onClick={toggleSimulation}
           title={isSimulating ? 'Turn off live DC/Logic simulation' : 'Turn on live DC & Logic Gate simulation'}
-          className={`flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded-md font-semibold text-xs transition-all shadow-sm ${
+          className={`flex items-center gap-1.5 px-1.5 md:px-2 py-1.5 rounded-md font-semibold text-xs transition-all shadow-sm ${
             isSimulating
               ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/40'
               : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:border-slate-600'
@@ -261,7 +262,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
         <button
           onClick={handleValidate}
           title="Validate all connection endpoints"
-          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
+          className="flex items-center gap-1 px-1.5 md:px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
         >
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <span className="hidden lg:inline">Validate Connections</span>
@@ -273,7 +274,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
           onClick={() => void applyAutoLayout()}
           disabled={isLayoutRunning}
           title="Compute orthogonal coordinates via ELKjs"
-          className="flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-medium text-xs shadow-sm shadow-sky-500/20 transition-colors"
+          className="flex items-center gap-1 px-1.5 md:px-2.5 py-1.5 rounded-md bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-medium text-xs shadow-sm shadow-sky-500/20 transition-colors"
         >
           <Wand2 className={`w-3.5 h-3.5 shrink-0 ${isLayoutRunning ? 'animate-spin' : ''}`} />
           <span className="hidden sm:inline">{isLayoutRunning ? 'Layouting...' : 'Auto-Layout'}</span>
@@ -289,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
             }}
             disabled={isExporting}
             title="Download or Print full resolution diagram"
-            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-1.5 md:px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium transition-colors"
           >
             {isExporting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400 shrink-0" />
@@ -396,7 +397,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
         <button
           onClick={onOpenAiPrompt}
           title="Format current circuit with AI instructions"
-          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md bg-purple-600/90 hover:bg-purple-500 text-purple-100 border border-purple-400/40 text-xs font-medium transition-colors"
+          className="flex items-center gap-1 px-1.5 md:px-2 py-1.5 rounded-md bg-purple-600/90 hover:bg-purple-500 text-purple-100 border border-purple-400/40 text-xs font-medium transition-colors"
         >
           <Sparkles className="w-3.5 h-3.5 text-purple-300 shrink-0" />
           <span className="hidden md:inline">Copy with AI Instructions</span>
@@ -415,11 +416,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
             }
           }}
           title="Clear the entire schematic canvas and DSL (Reset)"
-          className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-md hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-800/50 text-xs font-medium transition-colors"
+          className="flex items-center gap-1 px-1.5 md:px-2 py-1.5 rounded-md hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-800/50 text-xs font-medium transition-colors"
         >
           <Trash2 className="w-3.5 h-3.5 shrink-0" />
           <span className="hidden sm:inline">Clear All</span>
         </button>
+
+        {/* Cloud Auth + Drafts */}
+        <div className="flex items-center shrink-0 pl-1.5 md:pl-2 ml-0.5 border-l border-slate-800">
+          <CloudDraftsMenu />
+        </div>
       </div>
 
       {/* Validation Toast Notice */}
