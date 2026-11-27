@@ -7,9 +7,53 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
+import type { ComponentType } from '../../types/circuit.ts';
+
+const BI_DIRECTIONAL_COMPONENTS = new Set<ComponentType>([
+  'Resistor',
+  'Capacitor',
+  'Switch',
+  'Junction',
+  'Ohmmeter',
+]);
+
+const DIRECTIONAL_COMPONENTS = new Set<ComponentType>([
+  'LED',
+  'Buzzer',
+  'AND',
+  'OR',
+  'NOT',
+  'NAND',
+  'NOR',
+  'XOR',
+  'XNOR',
+  'D_FlipFlop',
+  'JK_FlipFlop',
+  'Clock',
+  'ESP32_30Pin',
+]);
+
+const isBidirectionalEdge = (
+  sourceType: ComponentType | undefined,
+  targetType: ComponentType | undefined
+): boolean => {
+  const hasDirectionalEndpoint =
+    (sourceType !== undefined && DIRECTIONAL_COMPONENTS.has(sourceType)) ||
+    (targetType !== undefined && DIRECTIONAL_COMPONENTS.has(targetType));
+  const hasBidirectionalEndpoint =
+    (sourceType !== undefined && BI_DIRECTIONAL_COMPONENTS.has(sourceType)) ||
+    (targetType !== undefined && BI_DIRECTIONAL_COMPONENTS.has(targetType));
+
+  return !hasDirectionalEndpoint && hasBidirectionalEndpoint;
+};
+
+const sanitizeMarkerId = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9_-]/g, '_');
 
 export const WireEdge: React.FC<EdgeProps> = ({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   sourcePosition,
@@ -18,8 +62,6 @@ export const WireEdge: React.FC<EdgeProps> = ({
   targetPosition,
   selected,
   style,
-  markerStart,
-  markerEnd,
   label,
   labelStyle,
   labelShowBg,
@@ -32,6 +74,11 @@ export const WireEdge: React.FC<EdgeProps> = ({
   const touchHandledRef = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
   const branchFromEdge = useCircuitStore((s) => s.branchFromEdge);
+  const components = useCircuitStore((s) => s.graph.components);
+
+  const sourceType = components.find((c) => c.id === source)?.type;
+  const targetType = components.find((c) => c.id === target)?.type;
+  const bidirectional = isBidirectionalEdge(sourceType, targetType);
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -52,6 +99,11 @@ export const WireEdge: React.FC<EdgeProps> = ({
         filter: 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.85))',
       }
     : (style as React.CSSProperties);
+
+  const strokeColor =
+    typeof wireStyle?.stroke === 'string' ? wireStyle.stroke : '#38bdf8';
+  const markerId = `wire-arrow-${sanitizeMarkerId(id)}-${sanitizeMarkerId(strokeColor)}`;
+  const markerUrl = `url(#${markerId})`;
 
   const handleBranchAtPoint = (clientX: number, clientY: number) => {
     const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
@@ -85,12 +137,27 @@ export const WireEdge: React.FC<EdgeProps> = ({
 
   return (
     <>
+      <defs>
+        <marker
+          id={markerId}
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="5"
+          markerHeight="5"
+          markerUnits="strokeWidth"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 L 2.5 5 Z" fill={strokeColor} />
+        </marker>
+      </defs>
+
       <BaseEdge
         id={id}
         path={edgePath}
         style={wireStyle}
-        markerStart={markerStart}
-        markerEnd={markerEnd}
+        markerStart={bidirectional ? markerUrl : undefined}
+        markerEnd={markerUrl}
         label={label}
         labelX={labelX}
         labelY={labelY}

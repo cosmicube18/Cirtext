@@ -15,20 +15,21 @@ export const GroundNode: React.FC<NodeProps> = (props) => {
       subtitle={data.value}
       selected={props.selected}
       pins={pins}
+      layout="ground"
     >
       <svg
-        width="56"
-        height="44"
-        viewBox="0 0 56 44"
-        className="stroke-emerald-400 fill-none"
+        width="36"
+        height="36"
+        viewBox="0 0 36 36"
+        className="stroke-emerald-400 fill-none overflow-visible"
       >
         {/* Top lead */}
-        <line x1="28" y1="0" x2="28" y2="16" strokeWidth="2" stroke="#38bdf8" />
+        <line x1="18" y1="0" x2="18" y2="8" strokeWidth="2" stroke="#38bdf8" />
 
         {/* Earth Ground descending horizontal plates */}
-        <line x1="12" y1="16" x2="44" y2="16" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="18" y1="24" x2="38" y2="24" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="24" y1="32" x2="32" y2="32" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="2" y1="8" x2="34" y2="8" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="8" y1="16" x2="28" y2="16" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="13" y1="24" x2="23" y2="24" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     </BaseNode>
   );

@@ -16,22 +16,23 @@ export const CapacitorNode: React.FC<NodeProps> = (props) => {
       editableValue={data.value || '100uF'}
       selected={props.selected}
       pins={pins}
+      layout="horizontal"
     >
       <svg
-        width="70"
-        height="40"
-        viewBox="0 0 70 40"
-        className="stroke-slate-200 fill-none"
+        width="80"
+        height="36"
+        viewBox="0 0 80 36"
+        className="stroke-slate-200 fill-none overflow-visible"
       >
         {/* Left terminal lead to plate 1 */}
-        <line x1="0" y1="20" x2="31" y2="20" strokeWidth="2" stroke="#38bdf8" />
+        <line x1="0" y1="18" x2="36" y2="18" strokeWidth="2" stroke="#38bdf8" />
         {/* Plate 1 */}
-        <line x1="31" y1="6" x2="31" y2="34" strokeWidth="2.75" className="stroke-cyan-300" strokeLinecap="round" />
+        <line x1="36" y1="4" x2="36" y2="32" strokeWidth="2.75" className="stroke-cyan-300" strokeLinecap="round" />
 
         {/* Plate 2 */}
-        <line x1="39" y1="6" x2="39" y2="34" strokeWidth="2.75" className="stroke-cyan-300" strokeLinecap="round" />
+        <line x1="44" y1="4" x2="44" y2="32" strokeWidth="2.75" className="stroke-cyan-300" strokeLinecap="round" />
         {/* Right terminal lead from plate 2 */}
-        <line x1="39" y1="20" x2="70" y2="20" strokeWidth="2" stroke="#38bdf8" />
+        <line x1="44" y1="18" x2="80" y2="18" strokeWidth="2" stroke="#38bdf8" />
       </svg>
     </BaseNode>
   );

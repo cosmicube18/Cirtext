@@ -29,7 +29,7 @@ export const SwitchNode: React.FC<NodeProps> = (props) => {
         title={data.id || props.id}
         subtitle={
           <span
-            className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors select-none ${
+            className={`font-mono text-[10px] font-bold px-1 py-0.5 rounded border transition-colors select-none ${
               isClosed
                 ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80 shadow-sm shadow-emerald-500/20'
                 : 'bg-amber-950/60 text-amber-400 border-amber-800/60'
@@ -40,25 +40,26 @@ export const SwitchNode: React.FC<NodeProps> = (props) => {
         }
         selected={props.selected}
         pins={pins}
+        layout="horizontal"
       >
         <svg
-          width="76"
+          width="80"
           height="36"
-          viewBox="0 0 76 36"
-          className="stroke-slate-200 fill-none select-none transition-all"
+          viewBox="0 0 80 36"
+          className="stroke-slate-200 fill-none select-none transition-all overflow-visible"
         >
           {/* Left terminal lead */}
-          <line x1="0" y1="18" x2="22" y2="18" strokeWidth="2" stroke="#38bdf8" />
+          <line x1="0" y1="18" x2="21" y2="18" strokeWidth="2" stroke="#38bdf8" />
           {/* Left terminal contact circle */}
-          <circle cx="24" cy="18" r="3" strokeWidth="2" className="stroke-sky-400 fill-slate-900" />
+          <circle cx="23" cy="18" r="2.5" strokeWidth="2" className="stroke-sky-400 fill-slate-950" />
 
           {/* Switch blade */}
           {isClosed ? (
             /* Closed position: horizontal connection bridging pins 1 and 2 */
             <line
-              x1="24"
+              x1="23"
               y1="18"
-              x2="52"
+              x2="57"
               y2="18"
               strokeWidth="2.8"
               strokeLinecap="round"
@@ -68,9 +69,9 @@ export const SwitchNode: React.FC<NodeProps> = (props) => {
           ) : (
             /* Open position: angled lever */
             <line
-              x1="26"
+              x1="25"
               y1="16"
-              x2="50"
+              x2="55"
               y2="6"
               strokeWidth="2.5"
               strokeLinecap="round"
@@ -79,9 +80,9 @@ export const SwitchNode: React.FC<NodeProps> = (props) => {
           )}
 
           {/* Right terminal contact circle */}
-          <circle cx="52" cy="18" r="3" strokeWidth="2" className="stroke-sky-400 fill-slate-900" />
+          <circle cx="57" cy="18" r="2.5" strokeWidth="2" className="stroke-sky-400 fill-slate-950" />
           {/* Right terminal lead */}
-          <line x1="55" y1="18" x2="76" y2="18" strokeWidth="2" stroke="#38bdf8" />
+          <line x1="59" y1="18" x2="80" y2="18" strokeWidth="2" stroke="#38bdf8" />
         </svg>
       </BaseNode>
     </div>

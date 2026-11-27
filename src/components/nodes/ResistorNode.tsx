@@ -16,20 +16,21 @@ export const ResistorNode: React.FC<NodeProps> = (props) => {
       editableValue={data.value || '10k'}
       selected={props.selected}
       pins={pins}
+      layout="horizontal"
     >
       <svg
-        width="76"
+        width="80"
         height="36"
-        viewBox="0 0 76 36"
-        className="stroke-slate-200 fill-none"
+        viewBox="0 0 80 36"
+        className="stroke-slate-200 fill-none overflow-visible"
       >
         {/* Left & right leads */}
-        <line x1="0" y1="18" x2="14" y2="18" strokeWidth="2" stroke="#38bdf8" />
-        <line x1="62" y1="18" x2="76" y2="18" strokeWidth="2" stroke="#38bdf8" />
+        <line x1="0" y1="18" x2="12" y2="18" strokeWidth="2" stroke="#38bdf8" />
+        <line x1="68" y1="18" x2="80" y2="18" strokeWidth="2" stroke="#38bdf8" />
 
         {/* Standard IEEE zig-zag resistor symbol */}
         <polyline
-          points="14,18 18,7 26,29 34,7 42,29 50,7 58,29 62,18"
+          points="12,18 16,6 24,30 32,6 40,30 48,6 56,30 64,6 68,18"
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"

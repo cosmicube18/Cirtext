@@ -3,6 +3,8 @@ import { Handle, Position } from '@xyflow/react';
 import type { PinDefinition } from '../../types/circuit.ts';
 import { InlineValueEditor } from './InlineValueEditor.tsx';
 
+export type BaseNodeLayout = 'horizontal' | 'vertical' | 'ground';
+
 export interface BaseNodeProps {
   id: string;
   title: string;
@@ -10,6 +12,7 @@ export interface BaseNodeProps {
   editableValue?: string;
   selected?: boolean;
   pins: PinDefinition[];
+  layout?: BaseNodeLayout;
   children: React.ReactNode;
 }
 
@@ -20,6 +23,18 @@ const POSITION_MAP: Record<'top' | 'bottom' | 'left' | 'right', Position> = {
   right: Position.Right,
 };
 
+const LAYOUT_CLASS: Record<BaseNodeLayout, string> = {
+  horizontal: 'w-20 h-9',
+  vertical: 'w-11 h-12',
+  ground: 'w-9 h-9',
+};
+
+const LABEL_POSITION_CLASS: Record<BaseNodeLayout, string> = {
+  horizontal: 'bottom-full mb-1',
+  vertical: 'top-full mt-1',
+  ground: 'top-full mt-1',
+};
+
 export const BaseNode: React.FC<BaseNodeProps> = ({
   id,
   title,
@@ -27,10 +42,12 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
   editableValue,
   selected = false,
   pins,
+  layout = 'horizontal',
   children,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const canEdit = editableValue !== undefined;
+  const labelEditable = canEdit && selected;
 
   const openEditor = (e: React.MouseEvent) => {
     if (!canEdit) return;
@@ -38,13 +55,13 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
     setIsEditing(true);
   };
 
+  const hasSubtitle = subtitle !== undefined && subtitle !== null && subtitle !== '';
+
   return (
     <div
       onDoubleClick={canEdit ? openEditor : undefined}
-      className={`relative group px-3 py-2 rounded-lg bg-slate-900/95 border transition-all duration-150 shadow-lg ${
-        selected
-          ? 'border-sky-400 ring-2 ring-sky-400/40 shadow-sky-500/20'
-          : 'border-slate-700/80 hover:border-slate-500'
+      className={`relative group select-none transition-all duration-150 ${LAYOUT_CLASS[layout]} ${
+        selected ? 'rounded ring-1 ring-amber-400/70' : ''
       }`}
     >
       {isEditing && canEdit && (
@@ -55,49 +72,45 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
         />
       )}
 
-      {/* Component Header (ID & Value/Label) */}
-      <div className="flex items-center justify-between gap-2 mb-1.5 pointer-events-none select-none">
-        <span className="font-mono text-xs font-bold text-sky-400 tracking-wide">
-          {title}
-        </span>
-        {subtitle && (
-          typeof subtitle === 'string' ? (
-            <span
-              onClick={
-                canEdit && selected
-                  ? openEditor
-                  : undefined
-              }
-              title={canEdit ? 'Double-click to edit value' : undefined}
-              className={`font-mono text-[11px] text-amber-300/90 font-medium px-1.5 py-0.2 rounded bg-amber-950/40 border border-amber-800/40 ${
-                canEdit && selected
-                  ? 'pointer-events-auto cursor-text hover:border-sky-400/70'
-                  : ''
-              }`}
-            >
-              {subtitle}
-            </span>
-          ) : (
-            subtitle
-          )
+      {/* Compact floating schematic label */}
+      <span
+        onClick={labelEditable ? openEditor : undefined}
+        title={canEdit ? 'Double-click to edit value' : undefined}
+        className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[11px] leading-none ${
+          LABEL_POSITION_CLASS[layout]
+        } ${
+          labelEditable
+            ? 'nodrag nopan pointer-events-auto cursor-text text-amber-200 hover:text-amber-100'
+            : 'pointer-events-none'
+        }`}
+      >
+        <span className="text-sky-300 font-semibold">{title}</span>
+        {hasSubtitle && (
+          <>
+            <span className="mx-0.5 text-slate-500">·</span>
+            {typeof subtitle === 'string' ? (
+              <span className="text-amber-300 font-medium">{subtitle}</span>
+            ) : (
+              subtitle
+            )}
+          </>
         )}
-      </div>
+      </span>
 
-      {/* SVG Symbol container */}
-      <div className="flex items-center justify-center min-w-[70px] min-h-[50px] my-1">
+      {/* Bare SVG schematic symbol */}
+      <div className="w-full h-full flex items-center justify-center">
         {children}
       </div>
 
-      {/* Terminal Pin Handles */}
+      {/* Terminal pin handles flush with symbol lead ends */}
       {pins.map((pin) => {
         const rfPosition = POSITION_MAP[pin.position];
 
-        // Position helper classes for terminal tooltip badge
         const badgePositionClass = {
           top: '-top-6 left-1/2 -translate-x-1/2',
           bottom: '-bottom-6 left-1/2 -translate-x-1/2',
-          left: '-left-8 top-1/2 -translate-y-1/2',
-          right: '-right-8 top-1/2 -translate-y-1/2',
+          left: '-left-7 top-1/2 -translate-y-1/2',
+          right: '-right-7 top-1/2 -translate-y-1/2',
         }[pin.position];
 
         return (
@@ -106,9 +119,8 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
               type="source"
               position={rfPosition}
               id={pin.id}
-              className="!w-3 !h-3 !border-2 !border-sky-400 !bg-slate-950 hover:!bg-sky-400 hover:!scale-125 transition-all"
+              className="!w-2.5 !h-2.5 !border !border-sky-400 !bg-slate-950 hover:!bg-sky-400 hover:!scale-125 transition-all"
             />
-            {/* Hover pin label badge */}
             <span
               className={`absolute pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono font-semibold px-1 py-0.5 rounded bg-slate-800 text-sky-300 border border-slate-700 shadow z-20 ${badgePositionClass}`}
             >

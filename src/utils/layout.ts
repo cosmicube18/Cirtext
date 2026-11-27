@@ -54,12 +54,15 @@ export async function calculateAutoLayout(
       case 'Junction':
         return { width: 16, height: 16 };
       case 'VoltageSource':
+        return { width: 56, height: 64 };
       case 'Resistor':
       case 'Capacitor':
-      case 'LED':
       case 'Switch':
+      case 'LED':
+      case 'Buzzer':
+        return { width: 84, height: 48 };
       case 'Ground':
-        return { width: 180, height: 130 };
+        return { width: 40, height: 40 };
       default:
         return { width: 180, height: 120 };
     }
@@ -124,15 +127,15 @@ export async function calculateAutoLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '160',
-      'elk.spacing.nodeNode': '60',
-      'elk.spacing.edgeNode': '50',
-      'elk.spacing.edgeEdge': '20',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '110',
+      'elk.spacing.nodeNode': '40',
+      'elk.spacing.edgeNode': '32',
+      'elk.spacing.edgeEdge': '14',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
       'elk.portConstraints': 'FIXED_SIDE',
       'elk.edgeRouting': 'ORTHOGONAL',
-      'elk.padding': '[top=64,left=64,bottom=64,right=64]',
+      'elk.padding': '[top=40,left=40,bottom=40,right=40]',
     },
     children: elkChildren,
     edges: elkEdges as any,
