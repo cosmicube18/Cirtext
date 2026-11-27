@@ -13,6 +13,7 @@ export const VoltageSourceNode: React.FC<NodeProps> = (props) => {
       id={props.id}
       title={data.id || props.id}
       subtitle={data.value || '5V'}
+      editableValue={data.value || '5V'}
       selected={props.selected}
       pins={pins}
     >

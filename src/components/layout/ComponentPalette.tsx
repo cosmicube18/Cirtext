@@ -174,9 +174,14 @@ export const ComponentPalette: React.FC<ComponentPaletteProps> = ({
                       return (
                         <button
                           key={type}
+                          draggable={true}
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData('application/reactflow', type);
+                            event.dataTransfer.effectAllowed = 'move';
+                          }}
                           onClick={() => handleAdd(type)}
-                          title={`Add ${meta.displayName}`}
-                          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700/60 hover:border-sky-500/60 text-slate-200 transition-all text-xs group active:scale-95"
+                          title={`Click or drag to add ${meta.displayName}`}
+                          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700/60 hover:border-sky-500/60 text-slate-200 transition-all text-xs group active:scale-95 cursor-grab active:cursor-grabbing"
                         >
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="font-mono font-bold text-sky-400 text-[10px] w-6 text-left shrink-0">

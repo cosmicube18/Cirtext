@@ -13,6 +13,7 @@ export const ResistorNode: React.FC<NodeProps> = (props) => {
       id={props.id}
       title={data.id || props.id}
       subtitle={data.value || '10k'}
+      editableValue={data.value || '10k'}
       selected={props.selected}
       pins={pins}
     >

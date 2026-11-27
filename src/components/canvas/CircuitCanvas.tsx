@@ -21,6 +21,7 @@ import { Crosshair, Trash2 } from 'lucide-react';
 import { circuitNodeTypes } from '../nodes/nodeTypes.ts';
 import { circuitEdgeTypes } from '../edges/edgeTypes.ts';
 import type { CircuitNode, CircuitEdge } from '../../types/flow.ts';
+import { COMPONENT_METADATA, type ComponentType } from '../../types/circuit.ts';
 import { CENTER_VIEW_EVENT } from '../../lib/viewportEvents.ts';
 
 export interface CircuitCanvasProps {
@@ -32,6 +33,7 @@ export interface CircuitCanvasProps {
   onNodesDelete?: (deletedNodes: CircuitNode[]) => void;
   onEdgesDelete?: (deletedEdges: CircuitEdge[]) => void;
   onOpenEsp32Code?: (componentId: string) => void;
+  onDropComponent?: (type: ComponentType, position: { x: number; y: number }) => void;
 }
 
 const CircuitCanvasInner: React.FC<CircuitCanvasProps> = ({
@@ -43,10 +45,11 @@ const CircuitCanvasInner: React.FC<CircuitCanvasProps> = ({
   onNodesDelete,
   onEdgesDelete,
   onOpenEsp32Code,
+  onDropComponent,
 }) => {
   const [selectedNodes, setSelectedNodes] = useState<CircuitNode[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<CircuitEdge[]>([]);
-  const { fitView, setViewport, getNodes } = useReactFlow();
+  const { fitView, setViewport, getNodes, screenToFlowPosition } = useReactFlow();
 
   const handleCenterView = useCallback(() => {
     if (getNodes().length > 0) {
@@ -195,10 +198,36 @@ const CircuitCanvasInner: React.FC<CircuitCanvasProps> = ({
     [onEdgesDelete]
   );
 
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData('application/reactflow') as ComponentType;
+      if (!type || !(type in COMPONENT_METADATA) || !onDropComponent) return;
+
+      const flowPos = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const snappedPos = {
+        x: Math.round(flowPos.x / 16) * 16,
+        y: Math.round(flowPos.y / 16) * 16,
+      };
+      onDropComponent(type, snappedPos);
+    },
+    [screenToFlowPosition, onDropComponent]
+  );
+
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
 
   return (
     <div
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className="w-full h-full min-w-0 min-h-0 flex-1 relative select-none bg-slate-950"
       style={{ width: '100%', height: '100%' }}
     >

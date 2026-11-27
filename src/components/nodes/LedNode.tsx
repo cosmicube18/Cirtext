@@ -28,6 +28,7 @@ export const LedNode: React.FC<NodeProps> = (props) => {
     <BaseNode
       id={props.id}
       title={data.id || props.id}
+      editableValue={data.value || 'Red'}
       subtitle={
         isSimulating ? (
           isLit ? (

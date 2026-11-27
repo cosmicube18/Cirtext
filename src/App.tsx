@@ -18,6 +18,7 @@ export const App: React.FC = () => {
     updateNodes,
     updateEdges,
     connectPins,
+    addComponent,
     deleteNodes,
     deleteEdges,
   } = useCircuitStore();
@@ -121,6 +122,7 @@ export const App: React.FC = () => {
             onNodesDelete={deleteNodes}
             onEdgesDelete={deleteEdges}
             onOpenEsp32Code={handleOpenEsp32Code}
+            onDropComponent={addComponent}
           />
           <EnvironmentPanel />
           {leftPanelCollapsed && (

@@ -13,6 +13,7 @@ export const CapacitorNode: React.FC<NodeProps> = (props) => {
       id={props.id}
       title={data.id || props.id}
       subtitle={data.value || '100uF'}
+      editableValue={data.value || '100uF'}
       selected={props.selected}
       pins={pins}
     >

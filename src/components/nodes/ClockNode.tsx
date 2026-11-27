@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { Handle, Position } from '@xyflow/react';
 import type { CircuitNodeData } from '../../types/flow.ts';
 import { useCircuitStore } from '../../store/circuitStore.ts';
+import { InlineValueEditor } from './InlineValueEditor.tsx';
 
 /**
  * Clock generator node.
@@ -14,26 +15,53 @@ export const ClockNode: React.FC<NodeProps> = (props) => {
   const isSimulating = useCircuitStore((s) => s.isSimulating);
   const clockHigh = useCircuitStore((s) => s.clockHigh);
   const pinStates = useCircuitStore((s) => s.simulationState.pinStates);
+  const [isEditing, setIsEditing] = useState(false);
 
   const stateOut = pinStates[`${props.id}.OUT`] ?? (clockHigh ? 1 : 0);
   const outColor = isSimulating && stateOut === 1 ? '#22c55e' : '#38bdf8';
+  const currentValue = data.value || 'Clock';
 
   return (
     <div
       style={{ width: '150px' }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
       className={`relative rounded-xl bg-slate-900/98 border transition-all duration-150 shadow-xl flex flex-col ${
         props.selected
           ? 'border-sky-400 ring-2 ring-sky-400/40 shadow-sky-500/20'
           : 'border-slate-700 hover:border-slate-500'
       }`}
     >
+      {isEditing && (
+        <InlineValueEditor
+          nodeId={props.id}
+          initialValue={currentValue}
+          onClose={() => setIsEditing(false)}
+        />
+      )}
+
       {/* Header: ID + Component Type */}
       <div className="w-full px-2.5 pt-2 pb-1.5 border-b border-slate-800 flex items-center justify-between select-none">
         <span className="font-mono text-xs font-bold text-sky-400">
           {data.id || props.id}
         </span>
-        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800/60 font-semibold">
-          Clock
+        <span
+          onClick={
+            props.selected
+              ? (e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }
+              : undefined
+          }
+          title="Double-click to edit value"
+          className={`text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800/60 font-semibold ${
+            props.selected ? 'cursor-text hover:border-sky-400' : ''
+          }`}
+        >
+          {currentValue}
         </span>
       </div>
 

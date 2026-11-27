@@ -17,6 +17,7 @@ export const BuzzerNode: React.FC<NodeProps> = (props) => {
     <BaseNode
       id={props.id}
       title={data.id || props.id}
+      editableValue={data.value || 'Piezo'}
       subtitle={
         isSimulating ? (
           isOn ? (

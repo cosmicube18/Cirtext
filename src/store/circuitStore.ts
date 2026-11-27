@@ -50,6 +50,7 @@ export interface CircuitState {
   updateEdges: (edges: CircuitEdge[]) => void;
   connectPins: (connection: Connection) => void;
   addComponent: (type: ComponentType, position?: { x: number; y: number }) => void;
+  updateComponentValue: (nodeId: string, newValue: string) => void;
   branchFromEdge: (edgeId: string, clickPosition: { x: number; y: number }) => string;
   deleteComponent: (id: string) => void;
   deleteNodes: (nodesToDelete: CircuitNode[] | string[]) => void;
@@ -581,6 +582,48 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
 
     const isSim = get().isSimulating;
     const simResult = runCircuitSimulation(updatedGraph, get().switchStates, get().flipFlopStates, get().clockHigh, get().esp32GpioStates);
+    const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
+    const newDsl = serializeGraph(updatedGraph);
+
+    set({
+      graph: updatedGraph,
+      nodes,
+      edges,
+      dslText: newDsl,
+      simulationState: simResult,
+      flipFlopStates: simResult.flipFlopStates,
+      lastUpdatedBy: 'canvas',
+    });
+  },
+
+  updateComponentValue: (nodeId: string, newValue: string) => {
+    const currentGraph = get().graph;
+    const targetComp = currentGraph.components.find((c) => c.id === nodeId);
+    if (!targetComp) return;
+
+    const trimmed = newValue.trim();
+    const normalizedNew = trimmed.length > 0 ? trimmed : undefined;
+    if ((targetComp.value ?? undefined) === normalizedNew) return;
+
+    get()._pushHistory();
+
+    const updatedComponents = currentGraph.components.map((comp) =>
+      comp.id === nodeId ? { ...comp, value: normalizedNew } : comp
+    );
+
+    const updatedGraph: CircuitGraph = {
+      ...currentGraph,
+      components: updatedComponents,
+    };
+
+    const isSim = get().isSimulating;
+    const simResult = runCircuitSimulation(
+      updatedGraph,
+      get().switchStates,
+      get().flipFlopStates,
+      get().clockHigh,
+      get().esp32GpioStates
+    );
     const { nodes, edges } = graphToNodesAndEdges(updatedGraph, isSim, simResult);
     const newDsl = serializeGraph(updatedGraph);
 
