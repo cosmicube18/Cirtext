@@ -16,11 +16,13 @@ import {
   Zap,
   Undo2,
   Redo2,
+  Heart,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/circuitStore.ts';
 import { SAMPLE_CIRCUITS } from '../../parser/sampleCircuits.ts';
 import { downloadDiagram, printDiagram } from '../../utils/exportDiagram.ts';
 import { CloudDraftsMenu } from '../cloud/CloudDraftsMenu.tsx';
+import { SupportModal } from '../modals/SupportModal.tsx';
 
 export interface NavbarProps {
   onOpenAiPrompt: () => void;
@@ -47,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [printLightMode, setPrintLightMode] = useState(true);
   const [validationToast, setValidationToast] = useState<string | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -422,6 +425,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
           <span className="hidden sm:inline">Clear All</span>
         </button>
 
+        {/* Support / Donate Button */}
+        <button
+          onClick={() => setSupportOpen(true)}
+          title="Support Cirtext development & hosting"
+          className="flex items-center gap-1 px-1.5 md:px-2 py-1.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400/50 text-xs font-medium transition-colors shrink-0"
+        >
+          <Heart className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+          <span className="hidden sm:inline">Support</span>
+        </button>
+
         {/* Cloud Auth + Drafts */}
         <div className="flex items-center shrink-0 pl-1.5 md:pl-2 ml-0.5 border-l border-slate-800">
           <CloudDraftsMenu />
@@ -435,6 +448,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAiPrompt }) => {
           <span>{validationToast}</span>
         </div>
       )}
+
+      {/* Support / Donation Modal */}
+      {supportOpen && <SupportModal onClose={() => setSupportOpen(false)} />}
     </header>
   );
 };

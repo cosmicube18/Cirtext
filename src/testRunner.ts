@@ -523,7 +523,128 @@ V1.neg -> GND.1`;
   assert(lowVSim.edgeStates['R2.2->AM1.pos'] === 1, 'Expected R2.2->AM1.pos downstream wire to be active (1)');
   assert(lowVSim.edgeStates['AM1.neg->GND.1'] === 1, 'Expected AM1.neg->GND.1 return wire to be active (1)');
 
-  console.log('--- All 16 Parser, Serializer, Layout, Gate, Closed-Loop, Sequential, MNA, Instrument & Junction Tests Passed! ---');
+  // Test 17: 4-Bit D_FlipFlop Shift/Parallel Register across clock cycles (0 -> 1 -> 0 -> 1)
+  const reg4BitDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+CLK1: Clock (2s)
+SW0: Switch (Bit0)
+SW1: Switch (Bit1)
+G_INV: NOT
+FF0: D_FlipFlop
+FF1: D_FlipFlop
+FF2: D_FlipFlop
+FF3: D_FlipFlop
+LED0: LED
+LED1: LED
+LED2: LED
+LED3: LED
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> SW0.1
+V1.pos -> SW1.1
+SW0.2 -> FF0.D
+SW1.2 -> G_INV.A
+G_INV.Y -> FF1.D
+FF0.Q -> FF2.D
+FF1.Q -> FF3.D
+CLK1.OUT -> FF0.CLK
+CLK1.OUT -> FF1.CLK
+CLK1.OUT -> FF2.CLK
+CLK1.OUT -> FF3.CLK
+FF0.Q -> LED0.anode
+FF1.Q -> LED1.anode
+FF2.Q -> LED2.anode
+FF3.Q -> LED3.anode
+LED0.cathode -> GND.1
+LED1.cathode -> GND.1
+LED2.cathode -> GND.1
+LED3.cathode -> GND.1
+V1.neg -> GND.1`;
+
+  const reg4Graph = parseDsl(reg4BitDsl).graph;
+  const regFfStates: FlipFlopStates = {};
+
+  // Cycle 0 (CLK = 0): SW0=1, SW1=0 -> FF0.D=1, FF1.D=1 (via NOT gate), all Qs initially 0
+  const r0 = runCircuitSimulation(reg4Graph, { SW0: true, SW1: false }, regFfStates, false);
+  for (const id of ['FF0', 'FF1', 'FF2', 'FF3']) {
+    assert(r0.pinStates[`${id}.Q`] === 0, `Expected ${id}.Q=0 initially`);
+    assert(r0.pinStates[`${id}.Q_BAR`] === 1, `Expected ${id}.Q_BAR=1 initially`);
+  }
+
+  // Rising edge #1 (CLK 0 -> 1): FF0 & FF1 latch D=1 (even with FF1.D driven by NOT gate!),
+  // while FF2 & FF3 sample pre-edge FF0.Q=0 / FF1.Q=0 synchronously
+  const r1 = runCircuitSimulation(reg4Graph, { SW0: true, SW1: false }, regFfStates, true);
+  assert(r1.pinStates['FF0.Q'] === 1 && r1.pinStates['FF0.Q_BAR'] === 0, 'Expected FF0 Q=1, Q_BAR=0 after rising edge #1');
+  assert(r1.pinStates['FF1.Q'] === 1 && r1.pinStates['FF1.Q_BAR'] === 0, 'Expected FF1 Q=1, Q_BAR=0 after rising edge #1');
+  assert(r1.pinStates['FF2.Q'] === 0 && r1.pinStates['FF2.Q_BAR'] === 1, 'Expected FF2 Q=0, Q_BAR=1 (synchronous shift)');
+  assert(r1.pinStates['FF3.Q'] === 0 && r1.pinStates['FF3.Q_BAR'] === 1, 'Expected FF3 Q=0, Q_BAR=1 (synchronous shift)');
+  assert(r1.ledStates['LED0'] === true && r1.ledStates['LED1'] === true, 'Expected LED0 & LED1 ON');
+
+  // Falling edge (CLK 1 -> 0): All D_FlipFlops hold
+  const r2 = runCircuitSimulation(reg4Graph, { SW0: false, SW1: true }, regFfStates, false);
+  assert(r2.pinStates['FF0.Q'] === 1 && r2.pinStates['FF0.Q_BAR'] === 0, 'Expected FF0 to hold on falling edge');
+  assert(r2.pinStates['FF1.Q'] === 1 && r2.pinStates['FF1.Q_BAR'] === 0, 'Expected FF1 to hold on falling edge');
+
+  // Rising edge #2 (CLK 0 -> 1): SW0=0, SW1=1 -> FF0.D=0, FF1.D=0; FF2 & FF3 capture previous FF0.Q=1 & FF1.Q=1
+  const r3 = runCircuitSimulation(reg4Graph, { SW0: false, SW1: true }, regFfStates, true);
+  assert(r3.pinStates['FF0.Q'] === 0 && r3.pinStates['FF0.Q_BAR'] === 1, 'Expected FF0 Q=0, Q_BAR=1 after rising edge #2');
+  assert(r3.pinStates['FF1.Q'] === 0 && r3.pinStates['FF1.Q_BAR'] === 1, 'Expected FF1 Q=0, Q_BAR=1 after rising edge #2');
+  assert(r3.pinStates['FF2.Q'] === 1 && r3.pinStates['FF2.Q_BAR'] === 0, 'Expected FF2 Q=1, Q_BAR=0 after rising edge #2');
+  assert(r3.pinStates['FF3.Q'] === 1 && r3.pinStates['FF3.Q_BAR'] === 0, 'Expected FF3 Q=1, Q_BAR=0 after rising edge #2');
+  assert(r3.ledStates['LED2'] === true && r3.ledStates['LED3'] === true, 'Expected LED2 & LED3 ON');
+
+  console.log('✓ Test 17 Passed: 4-Bit D_FlipFlop register latches Q and Q_BAR=!Q synchronously across clock cycles');
+
+  // Test 18: Voltmeter ideal input impedance (10 GΩ) — dual voltmeter across voltage divider
+  // Circuit: V1 (5V) -> R1 (10k) -> R2 (1k) -> GND
+  //          VM1 across R1 (pos=V1.pos node, neg=mid node)
+  //          VM2 across R2 (pos=mid node, neg=GND)
+  // Ideal divider: V_mid = 5 * 1000 / (10000 + 1000) = 5/11 ≈ 0.454545... V
+  // VM2 must read exactly that (10 GΩ load negligible vs 11 kΩ divider)
+  const vmDividerDsl = `# Circuit: Voltmeter Ideal Impedance Test
+[COMPONENTS]
+V1: VoltageSource (5V)
+R1: Resistor (10k)
+R2: Resistor (1k)
+VM1: Voltmeter
+VM2: Voltmeter
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R1.1
+R1.2 -> R2.1
+R2.2 -> GND.1
+V1.neg -> GND.1
+R1.1 -> VM1.pos
+R2.1 -> VM1.neg
+R2.1 -> VM2.pos
+R2.2 -> VM2.neg`;
+
+  const vmDivSim = runCircuitSimulation(parseDsl(vmDividerDsl).graph, {});
+
+  const vm2 = vmDivSim.instrumentReadings['VM2'];
+  assert(vm2 && vm2.status === 'ok', `Expected VM2 status ok, got ${vm2?.status}`);
+  // rawValue is in Volts (the unformatted numeric value behind the display string)
+  const vm2Raw = vm2.rawValue!;
+  const expectedVM2 = 5 * 1000 / 11000; // ≈ 0.454545...
+  assert(
+    Math.abs(vm2Raw - expectedVM2) < 1e-3,
+    `Expected VM2 ≈ ${expectedVM2.toFixed(6)} V, got ${vm2Raw} V (display: "${vm2.display}")`
+  );
+
+  const vm1 = vmDivSim.instrumentReadings['VM1'];
+  assert(vm1 && vm1.status === 'ok', `Expected VM1 status ok, got ${vm1?.status}`);
+  const vm1Raw = vm1.rawValue!;
+  const expectedVM1 = 5 * 10000 / 11000; // ≈ 4.545454...
+  assert(
+    Math.abs(vm1Raw - expectedVM1) < 1e-3,
+    `Expected VM1 ≈ ${expectedVM1.toFixed(6)} V, got ${vm1Raw} V (display: "${vm1.display}")`
+  );
+
+  console.log(`✓ Test 18 Passed: Voltmeter 10 GΩ ideal impedance — VM2=${vm2.display} (≈+454.55 mV), VM1=${vm1.display} (≈+4.55 V) across 10k/1k divider`);
+
+  console.log('--- All 18 Parser, Serializer, Layout, Gate, Closed-Loop, Sequential, MNA, Instrument, Junction & Voltmeter-Impedance Tests Passed! ---');
 }
 
 runTests();

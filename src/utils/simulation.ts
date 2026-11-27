@@ -265,18 +265,42 @@ export function runCircuitSimulation(
     }
   }
 
-  // 2. Iterative relaxation loop (up to 16 passes for signal and ground convergence)
+  // 2. Two-phase synchronous evaluation:
+  //    Phase A: Settle combinational logic, switches, resistors, and nets with flip-flops holding pre-tick Q/Q_BAR.
+  //    Phase B: Sample settled CLK/D/J/K once per tick and latch flip-flop states on active clock edges.
+  //    Phase C: Re-propagate updated Q/Q_BAR through combinational logic and nets.
   const MAX_ITERATIONS = 16;
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    let changed = false;
+  const runCombinationalSettling = () => {
+    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+      let changed = false;
 
-    // A. Propagate through passive conductive components (Switch, Resistor)
-    for (const comp of graph.components) {
-      if (comp.type === 'Switch') {
-        const isClosed = switchStates[comp.id] ?? false;
-        if (isClosed) {
-          const pin1 = `${comp.id}.1`;
-          const pin2 = `${comp.id}.2`;
+      // A. Propagate through passive conductive components (Switch, Resistor, Ammeter)
+      for (const comp of graph.components) {
+        if (comp.type === 'Switch') {
+          const isClosed = switchStates[comp.id] ?? false;
+          if (isClosed) {
+            const pin1 = `${comp.id}.1`;
+            const pin2 = `${comp.id}.2`;
+
+            // Bidirectional signal bridging
+            if ((pinStates[pin1] === 1 || pinStates[pin2] === 1) && (!pinStates[pin1] || !pinStates[pin2])) {
+              pinStates[pin1] = 1;
+              pinStates[pin2] = 1;
+              changed = true;
+            }
+
+            // Bidirectional ground bridging
+            if (isGrounded[pin1] && !isGrounded[pin2]) {
+              isGrounded[pin2] = true;
+              changed = true;
+            } else if (isGrounded[pin2] && !isGrounded[pin1]) {
+              isGrounded[pin1] = true;
+              changed = true;
+            }
+          }
+        } else if (comp.type === 'Resistor' || comp.type === 'Ammeter') {
+          const pin1 = comp.type === 'Ammeter' ? `${comp.id}.pos` : `${comp.id}.1`;
+          const pin2 = comp.type === 'Ammeter' ? `${comp.id}.neg` : `${comp.id}.2`;
 
           // Bidirectional signal bridging
           if ((pinStates[pin1] === 1 || pinStates[pin2] === 1) && (!pinStates[pin1] || !pinStates[pin2])) {
@@ -285,7 +309,7 @@ export function runCircuitSimulation(
             changed = true;
           }
 
-          // Bidirectional ground bridging
+          // Bidirectional ground bridging through current-limiting resistor / ammeter shunt
           if (isGrounded[pin1] && !isGrounded[pin2]) {
             isGrounded[pin2] = true;
             changed = true;
@@ -294,316 +318,255 @@ export function runCircuitSimulation(
             changed = true;
           }
         }
-      } else if (comp.type === 'Resistor' || comp.type === 'Ammeter') {
-        const pin1 = comp.type === 'Ammeter' ? `${comp.id}.pos` : `${comp.id}.1`;
-        const pin2 = comp.type === 'Ammeter' ? `${comp.id}.neg` : `${comp.id}.2`;
-
-        // Bidirectional signal bridging
-        if ((pinStates[pin1] === 1 || pinStates[pin2] === 1) && (!pinStates[pin1] || !pinStates[pin2])) {
-          pinStates[pin1] = 1;
-          pinStates[pin2] = 1;
-          changed = true;
-        }
-
-        // Bidirectional ground bridging through current-limiting resistor / ammeter shunt
-        if (isGrounded[pin1] && !isGrounded[pin2]) {
-          isGrounded[pin2] = true;
-          changed = true;
-        } else if (isGrounded[pin2] && !isGrounded[pin1]) {
-          isGrounded[pin1] = true;
-          changed = true;
-        }
-      }
-    }
-
-    // Power component propagation: ESP32_30Pin, TP4056, Boost5V
-    for (const comp of graph.components) {
-      // ESP32_30Pin: VIN (5V in) -> 3V3 (3.3V out), GND/GND2 always grounded
-      if (comp.type === 'ESP32_30Pin') {
-        const vinPin = `${comp.id}.VIN`;
-        const v33Pin = `${comp.id}.3V3`;
-        const gndPin = `${comp.id}.GND`;
-        const gnd2Pin = `${comp.id}.GND2`;
-
-        // If VIN is HIGH (5V supplied), drive 3V3 HIGH (regulator output)
-        if (pinStates[vinPin] === 1 && pinStates[v33Pin] !== 1) {
-          pinStates[v33Pin] = 1;
-          changed = true;
-        }
-        // Back-powering: if 3V3 is externally driven HIGH, keep it HIGH
-        // (already handled by net propagation, but ensure GNDs stay grounded)
-        if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
-          isGrounded[gnd2Pin] = true;
-          changed = true;
-        } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
-          isGrounded[gndPin] = true;
-          changed = true;
-        }
       }
 
-      // TP4056: IN+/IN- (charge input) -> BAT+/BAT- (battery output)
-      else if (comp.type === 'TP4056') {
-        const inPlusPin = `${comp.id}.IN+`;
-        const inMinusPin = `${comp.id}.IN-`;
-        const batPlusPin = `${comp.id}.BAT+`;
-        const batMinusPin = `${comp.id}.BAT-`;
+      // Power component propagation: ESP32_30Pin, TP4056, Boost5V
+      for (const comp of graph.components) {
+        if (comp.type === 'ESP32_30Pin') {
+          const vinPin = `${comp.id}.VIN`;
+          const v33Pin = `${comp.id}.3V3`;
+          const gndPin = `${comp.id}.GND`;
+          const gnd2Pin = `${comp.id}.GND2`;
 
-        // Charging active: IN+ HIGH AND IN- grounded -> BAT+ HIGH (charging ~4.2V)
-        const charging = pinStates[inPlusPin] === 1 && isGrounded[inMinusPin];
-        if (charging && pinStates[batPlusPin] !== 1) {
-          pinStates[batPlusPin] = 1;
-          changed = true;
-        }
-        // If no charging input, assume battery connected -> BAT+ HIGH (simplified)
-        else if (!charging && pinStates[batPlusPin] === 0) {
-          // Check if BAT+ is connected to anything (has net connections)
-          // For simplicity, treat as HIGH if any load could be connected
-          // In practice, net propagation will handle external drive
-        }
-        // BAT- always grounded
-        if (isGrounded[batMinusPin] && !isGrounded[inMinusPin]) {
-          isGrounded[inMinusPin] = true;
-          changed = true;
+          if (pinStates[vinPin] === 1 && pinStates[v33Pin] !== 1) {
+            pinStates[v33Pin] = 1;
+            changed = true;
+          }
+          if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
+            isGrounded[gnd2Pin] = true;
+            changed = true;
+          } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
+            isGrounded[gndPin] = true;
+            changed = true;
+          }
+        } else if (comp.type === 'TP4056') {
+          const inPlusPin = `${comp.id}.IN+`;
+          const inMinusPin = `${comp.id}.IN-`;
+          const batPlusPin = `${comp.id}.BAT+`;
+          const batMinusPin = `${comp.id}.BAT-`;
+
+          const charging = pinStates[inPlusPin] === 1 && isGrounded[inMinusPin];
+          if (charging && pinStates[batPlusPin] !== 1) {
+            pinStates[batPlusPin] = 1;
+            changed = true;
+          }
+          if (isGrounded[batMinusPin] && !isGrounded[inMinusPin]) {
+            isGrounded[inMinusPin] = true;
+            changed = true;
+          }
+        } else if (comp.type === 'Boost5V') {
+          const vinPin = `${comp.id}.VIN`;
+          const gndPin = `${comp.id}.GND`;
+          const voutPin = `${comp.id}.VOUT`;
+          const gnd2Pin = `${comp.id}.GND2`;
+
+          const boosting = pinStates[vinPin] === 1 && isGrounded[gndPin];
+          if (boosting && pinStates[voutPin] !== 1) {
+            pinStates[voutPin] = 1;
+            changed = true;
+          }
+          if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
+            isGrounded[gnd2Pin] = true;
+            changed = true;
+          } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
+            isGrounded[gndPin] = true;
+            changed = true;
+          }
         }
       }
 
-      // Boost5V: VIN/GND (battery in) -> VOUT/GND2 (5V out)
-      else if (comp.type === 'Boost5V') {
-        const vinPin = `${comp.id}.VIN`;
-        const gndPin = `${comp.id}.GND`;
-        const voutPin = `${comp.id}.VOUT`;
-        const gnd2Pin = `${comp.id}.GND2`;
-
-        // Boost active: VIN HIGH AND GND grounded -> VOUT HIGH (5V output)
-        const boosting = pinStates[vinPin] === 1 && isGrounded[gndPin];
-        if (boosting && pinStates[voutPin] !== 1) {
-          pinStates[voutPin] = 1;
-          changed = true;
-        }
-        // GND and GND2 always same potential (both grounded)
-        if (isGrounded[gndPin] && !isGrounded[gnd2Pin]) {
-          isGrounded[gnd2Pin] = true;
-          changed = true;
-        } else if (isGrounded[gnd2Pin] && !isGrounded[gndPin]) {
-          isGrounded[gndPin] = true;
-          changed = true;
-        }
+      // B. Build nets (connected pin groups) and propagate signals through nets
+      const pinAdjacency: Record<string, string[]> = {};
+      for (const conn of graph.connections) {
+        const srcPin = `${conn.sourceComponentId}.${conn.sourcePinId}`;
+        const tgtPin = `${conn.targetComponentId}.${conn.targetPinId}`;
+        if (!pinAdjacency[srcPin]) pinAdjacency[srcPin] = [];
+        if (!pinAdjacency[tgtPin]) pinAdjacency[tgtPin] = [];
+        pinAdjacency[srcPin].push(tgtPin);
+        pinAdjacency[tgtPin].push(srcPin);
       }
-    }
 
-    // B. Build nets (connected pin groups) and propagate signals through nets
-    // Build adjacency list of pins connected by wires AND passive component internal connections
-    const pinAdjacency: Record<string, string[]> = {};
-    
-    // Add wire connections
-    for (const conn of graph.connections) {
-      const srcPin = `${conn.sourceComponentId}.${conn.sourcePinId}`;
-      const tgtPin = `${conn.targetComponentId}.${conn.targetPinId}`;
-      if (!pinAdjacency[srcPin]) pinAdjacency[srcPin] = [];
-      if (!pinAdjacency[tgtPin]) pinAdjacency[tgtPin] = [];
-      pinAdjacency[srcPin].push(tgtPin);
-      pinAdjacency[tgtPin].push(srcPin);
-    }
-    
-    // Add passive component internal connections (Resistor.1 <-> Resistor.2 always, Switch only when closed)
-    for (const comp of graph.components) {
-      if (comp.type === 'Resistor' || comp.type === 'Ammeter') {
-        const pin1 = comp.type === 'Ammeter' ? `${comp.id}.pos` : `${comp.id}.1`;
-        const pin2 = comp.type === 'Ammeter' ? `${comp.id}.neg` : `${comp.id}.2`;
-        if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
-        if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
-        pinAdjacency[pin1].push(pin2);
-        pinAdjacency[pin2].push(pin1);
-      } else if (comp.type === 'Switch') {
-        const isClosed = switchStates[comp.id] ?? false;
-        if (isClosed) {
-          const pin1 = `${comp.id}.1`;
-          const pin2 = `${comp.id}.2`;
+      for (const comp of graph.components) {
+        if (comp.type === 'Resistor' || comp.type === 'Ammeter') {
+          const pin1 = comp.type === 'Ammeter' ? `${comp.id}.pos` : `${comp.id}.1`;
+          const pin2 = comp.type === 'Ammeter' ? `${comp.id}.neg` : `${comp.id}.2`;
           if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
           if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
           pinAdjacency[pin1].push(pin2);
           pinAdjacency[pin2].push(pin1);
-        }
-      }
-    }
-
-    // Find all nets using DFS
-    const visited = new Set<string>();
-    const nets: string[][] = [];
-
-    for (const pin of Object.keys(pinAdjacency)) {
-      if (visited.has(pin)) continue;
-      const net: string[] = [];
-      const stack = [pin];
-      while (stack.length > 0) {
-        const current = stack.pop()!;
-        if (visited.has(current)) continue;
-        visited.add(current);
-        net.push(current);
-        for (const neighbor of pinAdjacency[current] || []) {
-          if (!visited.has(neighbor)) stack.push(neighbor);
-        }
-      }
-      nets.push(net);
-    }
-
-    // For each net, find driver outputs and propagate their value to all pins in the net
-    // Driver outputs: VoltageSource pos, Logic gate Y, Flip-Flop Q/Q_BAR, Clock OUT, Power outputs (3V3, BAT+, VOUT)
-    const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR', 'OUT', '3V3', 'BAT+', 'VOUT']);
-    for (const net of nets) {
-      let driverValue: 0 | 1 | null = null;
-      let hasDriver = false;
-
-      // Find driver value in this net
-      for (const pin of net) {
-        const pinName = pin.split('.').pop() || '';
-        if (driverPinIds.has(pinName) || activeSourcePins.has(pin)) {
-          const val = pinStates[pin] ?? 0;
-          if (!hasDriver) {
-            driverValue = val;
-            hasDriver = true;
-          } else if (driverValue !== val) {
-            // Multiple drivers with conflicting values - net is contested, leave as-is
-            hasDriver = false;
-            break;
+        } else if (comp.type === 'Switch') {
+          const isClosed = switchStates[comp.id] ?? false;
+          if (isClosed) {
+            const pin1 = `${comp.id}.1`;
+            const pin2 = `${comp.id}.2`;
+            if (!pinAdjacency[pin1]) pinAdjacency[pin1] = [];
+            if (!pinAdjacency[pin2]) pinAdjacency[pin2] = [];
+            pinAdjacency[pin1].push(pin2);
+            pinAdjacency[pin2].push(pin1);
           }
         }
       }
 
-      // Propagate driver value to all pins in net
-      if (hasDriver && driverValue !== null) {
+      const visited = new Set<string>();
+      const nets: string[][] = [];
+      for (const pin of Object.keys(pinAdjacency)) {
+        if (visited.has(pin)) continue;
+        const net: string[] = [];
+        const stack = [pin];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          if (visited.has(current)) continue;
+          visited.add(current);
+          net.push(current);
+          for (const neighbor of pinAdjacency[current] || []) {
+            if (!visited.has(neighbor)) stack.push(neighbor);
+          }
+        }
+        nets.push(net);
+      }
+
+      const driverPinIds = new Set(['pos', 'Y', 'Q', 'Q_BAR', 'OUT', '3V3', 'BAT+', 'VOUT']);
+      for (const net of nets) {
+        let driverValue: 0 | 1 | null = null;
+        let hasDriver = false;
+
         for (const pin of net) {
-          if (pinStates[pin] !== driverValue) {
-            pinStates[pin] = driverValue;
+          const pinName = pin.split('.').pop() || '';
+          if (driverPinIds.has(pinName) || activeSourcePins.has(pin)) {
+            const val = pinStates[pin] ?? 0;
+            if (!hasDriver) {
+              driverValue = val;
+              hasDriver = true;
+            } else if (driverValue !== val) {
+              hasDriver = false;
+              break;
+            }
+          }
+        }
+
+        if (hasDriver && driverValue !== null) {
+          for (const pin of net) {
+            if (pinStates[pin] !== driverValue) {
+              pinStates[pin] = driverValue;
+              changed = true;
+            }
+          }
+        }
+
+        let netIsGrounded = false;
+        for (const pin of net) {
+          if (isGrounded[pin]) {
+            netIsGrounded = true;
+            break;
+          }
+        }
+        if (netIsGrounded) {
+          for (const pin of net) {
+            if (!isGrounded[pin]) {
+              isGrounded[pin] = true;
+              changed = true;
+            }
+          }
+        }
+      }
+
+      // C. Directional Logic Gate Evaluation (AND, OR, NOT, NAND, NOR, XOR, XNOR)
+      for (const comp of graph.components) {
+        const isGate = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'].includes(comp.type);
+        if (isGate) {
+          const inA = pinStates[`${comp.id}.A`] ?? 0;
+          const inB = pinStates[`${comp.id}.B`] ?? 0;
+          let outY: 0 | 1 = 0;
+
+          switch (comp.type) {
+            case 'AND':
+              outY = inA === 1 && inB === 1 ? 1 : 0;
+              break;
+            case 'NAND':
+              outY = !(inA === 1 && inB === 1) ? 1 : 0;
+              break;
+            case 'OR':
+              outY = inA === 1 || inB === 1 ? 1 : 0;
+              break;
+            case 'NOR':
+              outY = !(inA === 1 || inB === 1) ? 1 : 0;
+              break;
+            case 'XOR':
+              outY = inA !== inB ? 1 : 0;
+              break;
+            case 'XNOR':
+              outY = inA === inB ? 1 : 0;
+              break;
+            case 'NOT':
+              outY = inA === 0 ? 1 : 0;
+              break;
+          }
+
+          const yPin = `${comp.id}.Y`;
+          if (pinStates[yPin] !== outY) {
+            pinStates[yPin] = outY;
             changed = true;
           }
         }
       }
 
-      // Bidirectional ground reachability across the entire net
-      let netIsGrounded = false;
-      for (const pin of net) {
-        if (isGrounded[pin]) {
-          netIsGrounded = true;
-          break;
-        }
-      }
-      if (netIsGrounded) {
-        for (const pin of net) {
-          if (!isGrounded[pin]) {
-            isGrounded[pin] = true;
-            changed = true;
-          }
-        }
+      if (!changed) break;
+    }
+  };
+
+  // Phase A: Settle all combinational logic, switches, and nets before sampling clock edges
+  runCombinationalSettling();
+
+  // Phase B: Sequential Logic Evaluation (D_FlipFlop, JK_FlipFlop) once per tick
+  let anyFlipFlopChanged = false;
+  for (const comp of graph.components) {
+    if (comp.type !== 'D_FlipFlop' && comp.type !== 'JK_FlipFlop') continue;
+
+    const compId = comp.id;
+    const currClk = (pinStates[`${compId}.CLK`] ?? 0) === 1;
+
+    if (!flipFlopStates[compId]) {
+      flipFlopStates[compId] = { q: false, prevClk: false };
+    }
+    const ffState = flipFlopStates[compId];
+
+    const risingEdge = !ffState.prevClk && currClk;
+    const fallingEdge = ffState.prevClk && !currClk;
+
+    if (comp.type === 'D_FlipFlop' && risingEdge) {
+      const inD = pinStates[`${compId}.D`] ?? 0;
+      ffState.q = inD === 1;
+    } else if (comp.type === 'JK_FlipFlop' && fallingEdge) {
+      const inJ = pinStates[`${compId}.J`] ?? 0;
+      const inK = pinStates[`${compId}.K`] ?? 0;
+
+      if (inJ === 0 && inK === 1) {
+        ffState.q = false;
+      } else if (inJ === 1 && inK === 0) {
+        ffState.q = true;
+      } else if (inJ === 1 && inK === 1) {
+        ffState.q = !ffState.q;
       }
     }
 
-    // C. Directional Logic Gate Evaluation (AND, OR, NOT, NAND, NOR, XOR, XNOR)
-    for (const comp of graph.components) {
-      const isGate = [
-        'AND',
-        'OR',
-        'NOT',
-        'NAND',
-        'NOR',
-        'XOR',
-        'XNOR',
-      ].includes(comp.type);
+    ffState.prevClk = currClk;
 
-      if (isGate) {
-        const inA = pinStates[`${comp.id}.A`] ?? 0;
-        const inB = pinStates[`${comp.id}.B`] ?? 0;
-        let outY: 0 | 1 = 0;
+    const outQ: 0 | 1 = ffState.q ? 1 : 0;
+    const outQBar: 0 | 1 = ffState.q ? 0 : 1;
 
-        switch (comp.type) {
-          case 'AND':
-            outY = inA === 1 && inB === 1 ? 1 : 0;
-            break;
-          case 'NAND':
-            outY = !(inA === 1 && inB === 1) ? 1 : 0;
-            break;
-          case 'OR':
-            outY = inA === 1 || inB === 1 ? 1 : 0;
-            break;
-          case 'NOR':
-            outY = !(inA === 1 || inB === 1) ? 1 : 0;
-            break;
-          case 'XOR':
-            outY = inA !== inB ? 1 : 0;
-            break;
-          case 'XNOR':
-            outY = inA === inB ? 1 : 0;
-            break;
-          case 'NOT':
-            outY = inA === 0 ? 1 : 0;
-            break;
-        }
-
-        const yPin = `${comp.id}.Y`;
-        if (pinStates[yPin] !== outY) {
-          pinStates[yPin] = outY;
-          changed = true;
-        }
-      }
-
-      // Sequential Logic Evaluation (D_FlipFlop, JK_FlipFlop) with edge detection.
-      // Edge polarity matches standard 74xx parts:
-      //   - D_FlipFlop  (e.g. 74LS74): POSITIVE-edge, latches on CLK 0 -> 1.
-      //   - JK_FlipFlop (e.g. 74LS73/74LS76): NEGATIVE-edge, latches on CLK 1 -> 0.
-      // The negative-edge JK is what makes a ripple counter wired Q -> CLK of the
-      // next stage (with J = K = 1) count UP (0, 1, 2, 3, ...).
-      if (comp.type === 'D_FlipFlop' || comp.type === 'JK_FlipFlop') {
-        const compId = comp.id;
-        const currClk = (pinStates[`${compId}.CLK`] ?? 0) === 1;
-
-        // Initialize or retrieve flip-flop state
-        if (!flipFlopStates[compId]) {
-          flipFlopStates[compId] = { q: false, prevClk: false };
-        }
-        const ffState = flipFlopStates[compId];
-
-        // Rising edge: CLK went from LOW to HIGH (D flip-flop active edge)
-        const risingEdge = !ffState.prevClk && currClk;
-        // Falling edge: CLK went from HIGH to LOW (JK flip-flop active edge)
-        const fallingEdge = ffState.prevClk && !currClk;
-
-        if (comp.type === 'D_FlipFlop' && risingEdge) {
-          const inD = pinStates[`${compId}.D`] ?? 0;
-          ffState.q = inD === 1;
-        } else if (comp.type === 'JK_FlipFlop' && fallingEdge) {
-          const inJ = pinStates[`${compId}.J`] ?? 0;
-          const inK = pinStates[`${compId}.K`] ?? 0;
-
-          if (inJ === 0 && inK === 0) {
-            // Hold: q stays the same
-          } else if (inJ === 0 && inK === 1) {
-            ffState.q = false; // Reset
-          } else if (inJ === 1 && inK === 0) {
-            ffState.q = true; // Set
-          } else if (inJ === 1 && inK === 1) {
-            ffState.q = !ffState.q; // Toggle
-          }
-        }
-
-        // Always update prevClk for next evaluation
-        ffState.prevClk = currClk;
-
-        // Drive outputs
-        const outQ: 0 | 1 = ffState.q ? 1 : 0;
-        const outQBar: 0 | 1 = ffState.q ? 0 : 1;
-
-        if (pinStates[`${compId}.Q`] !== outQ) {
-          pinStates[`${compId}.Q`] = outQ;
-          changed = true;
-        }
-        if (pinStates[`${compId}.Q_BAR`] !== outQBar) {
-          pinStates[`${compId}.Q_BAR`] = outQBar;
-          changed = true;
-        }
-      }
+    if (pinStates[`${compId}.Q`] !== outQ) {
+      pinStates[`${compId}.Q`] = outQ;
+      anyFlipFlopChanged = true;
     }
+    if (pinStates[`${compId}.Q_BAR`] !== outQBar) {
+      pinStates[`${compId}.Q_BAR`] = outQBar;
+      anyFlipFlopChanged = true;
+    }
+  }
 
-    if (!changed) break;
+  // Phase C: Re-propagate updated Q / Q_BAR through downstream combinational logic and nets
+  if (anyFlipFlopChanged) {
+    runCombinationalSettling();
   }
 
   // 3. DC Modified Nodal Analysis (MNA) Linear Solver
@@ -860,7 +823,7 @@ export function runCircuitSimulation(
     } else if (comp.type === 'Voltmeter') {
       const pin1 = `${comp.id}.pos`;
       const pin2 = `${comp.id}.neg`;
-      passives.push({ compId: comp.id, pin1, pin2, n1: getNode(pin1), n2: getNode(pin2), R: 1e7 });
+      passives.push({ compId: comp.id, pin1, pin2, n1: getNode(pin1), n2: getNode(pin2), R: 1e10 }); // 10 GΩ ideal input impedance
     } else if (comp.type === 'Ammeter') {
       const pin1 = `${comp.id}.pos`;
       const pin2 = `${comp.id}.neg`;
@@ -1265,7 +1228,7 @@ export function runCircuitSimulation(
         } else if (c.type === 'Ammeter') {
           stampIso(`${c.id}.pos`, `${c.id}.neg`, 0.001);
         } else if (c.type === 'Voltmeter') {
-          stampIso(`${c.id}.pos`, `${c.id}.neg`, 1e7);
+          stampIso(`${c.id}.pos`, `${c.id}.neg`, 1e10); // 10 GΩ ideal input impedance
         } else if (c.type === 'Capacitor') {
           stampIso(`${c.id}.1`, `${c.id}.2`, 1e9);
         }
