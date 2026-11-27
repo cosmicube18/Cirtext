@@ -17,7 +17,7 @@ export const JunctionNode: React.FC<NodeProps<CircuitNode>> = ({ data, selected 
   return (
     <div
       title={tooltip}
-      className="relative w-4 h-4 flex items-center justify-center group select-none"
+      className="relative w-9 h-9 flex items-center justify-center group select-none touch-none"
     >
       {/* Solid 12px x 12px circular solder dot with subtle hover/selected ring */}
       <div
@@ -29,7 +29,7 @@ export const JunctionNode: React.FC<NodeProps<CircuitNode>> = ({ data, selected 
         } ${isEnergized ? 'shadow-[0_0_8px_rgba(16,185,129,0.8)]' : ''}`}
       />
 
-      {/* Centered bidirectional handles so multiple incoming/outgoing wires attach to the dot center */}
+      {/* Centered bidirectional handles with enlarged touch hit areas */}
       <Handle
         id="1"
         type="target"
@@ -39,8 +39,8 @@ export const JunctionNode: React.FC<NodeProps<CircuitNode>> = ({ data, selected 
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 12,
-          height: 12,
+          width: 24,
+          height: 24,
           opacity: 0,
         }}
       />
@@ -53,8 +53,8 @@ export const JunctionNode: React.FC<NodeProps<CircuitNode>> = ({ data, selected 
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 12,
-          height: 12,
+          width: 24,
+          height: 24,
           opacity: 0,
         }}
       />

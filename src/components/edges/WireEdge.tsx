@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -29,6 +29,7 @@ export const WireEdge: React.FC<EdgeProps> = ({
   pathOptions,
 }) => {
   const [hovered, setHovered] = useState(false);
+  const touchHandledRef = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
   const branchFromEdge = useCircuitStore((s) => s.branchFromEdge);
 
@@ -57,6 +58,31 @@ export const WireEdge: React.FC<EdgeProps> = ({
     branchFromEdge(id, { x: flowPos.x - 8, y: flowPos.y - 8 });
   };
 
+  const handleBranchEvent = (
+    e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>
+  ) => {
+    e.stopPropagation();
+    const point = 'changedTouches' in e ? e.changedTouches[0] : e;
+    if (!point) return;
+    handleBranchAtPoint(point.clientX, point.clientY);
+  };
+
+  const handleBranchClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (touchHandledRef.current) return;
+    handleBranchEvent(e);
+  };
+
+  const handleBranchTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    touchHandledRef.current = true;
+    window.setTimeout(() => {
+      touchHandledRef.current = false;
+    }, 600);
+    handleBranchEvent(e);
+  };
+
   return (
     <>
       <BaseEdge
@@ -75,12 +101,13 @@ export const WireEdge: React.FC<EdgeProps> = ({
         labelBgBorderRadius={labelBgBorderRadius}
       />
 
-      {/* Transparent hit-target path for hover detection & Shift/Alt+Click anywhere on wire */}
+      {/* Wide transparent hit-target path so taps select the wire reliably on touch screens */}
       <path
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={18}
+        strokeWidth={28}
+        style={{ pointerEvents: 'stroke' }}
         className="react-flow__edge-interaction cursor-crosshair"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -106,12 +133,11 @@ export const WireEdge: React.FC<EdgeProps> = ({
           >
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                branchFromEdge(id, { x: labelX - 8, y: labelY - 8 });
-              }}
-              title="Add wire junction (or Shift+Click anywhere on wire)"
-              className="w-5 h-5 rounded-full bg-slate-900/95 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/70 shadow-lg flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
+              onClick={handleBranchClick}
+              onTouchEnd={handleBranchTouchEnd}
+              title="Add wire junction"
+              aria-label="Add wire junction"
+              className="nodrag nopan w-8 h-8 rounded-full bg-slate-900/95 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/70 shadow-lg flex items-center justify-center text-lg font-bold transition-all hover:scale-110 touch-none"
             >
               +
             </button>
