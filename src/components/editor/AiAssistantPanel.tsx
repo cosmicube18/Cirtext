@@ -175,6 +175,7 @@ ${currentDsl.trim()}
       const failoverModels = [
         'nvidia/nemotron-3.5-super-vl:free',
         'nvidia/nemotron-3-ultra-550b-a55b:free',
+        'google/gemma-4-31b-it:free',
         'openrouter/free',
       ];
       const modelsList = Array.from(new Set([activeModel, ...failoverModels])).slice(0, 3);
@@ -197,7 +198,7 @@ ${currentDsl.trim()}
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': window.location.origin,
-            'X-OpenRouter-Title': 'Cirtext',
+            'X-Title': 'Cirtext',
           },
           body: JSON.stringify({
             model: activeModel,
