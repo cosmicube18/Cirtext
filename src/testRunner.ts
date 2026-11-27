@@ -506,6 +506,23 @@ V1.neg -> GND.1`;
 
   console.log('✓ Test 16 Passed: Wire-to-wire Junctions (branchFromEdge, DSL round-trip, ELKjs layout, and MNA parallel split) verified');
 
+  // Verify downstream low-voltage closed-loop wires glow green when branchCurrent > 0.1 uA
+  const lowVLoopDsl = `[COMPONENTS]
+V1: VoltageSource (5V)
+R2: Resistor (500)
+AM1: Ammeter
+GND: Ground
+
+[CONNECTIONS]
+V1.pos -> R2.1
+R2.2 -> AM1.pos
+AM1.neg -> GND.1
+V1.neg -> GND.1`;
+  const lowVSim = runCircuitSimulation(parseDsl(lowVLoopDsl).graph, {});
+  assert(lowVSim.instrumentReadings['AM1']?.display === '+10.00 mA', `Expected +10.00 mA, got ${lowVSim.instrumentReadings['AM1']?.display}`);
+  assert(lowVSim.edgeStates['R2.2->AM1.pos'] === 1, 'Expected R2.2->AM1.pos downstream wire to be active (1)');
+  assert(lowVSim.edgeStates['AM1.neg->GND.1'] === 1, 'Expected AM1.neg->GND.1 return wire to be active (1)');
+
   console.log('--- All 16 Parser, Serializer, Layout, Gate, Closed-Loop, Sequential, MNA, Instrument & Junction Tests Passed! ---');
 }
 

@@ -1289,8 +1289,13 @@ export function runCircuitSimulation(
   for (const conn of graph.connections) {
     const srcPin = `${conn.sourceComponentId}.${conn.sourcePinId}`;
     const tgtPin = `${conn.targetComponentId}.${conn.targetPinId}`;
-    const isLive = pinStates[srcPin] === 1 || pinStates[tgtPin] === 1 ? 1 : 0;
-    edgeStates[conn.id] = isLive;
+    const srcVoltage = nodeVoltages[srcPin] ?? 0;
+    const tgtVoltage = nodeVoltages[tgtPin] ?? 0;
+    const edgeCurrent = branchCurrents[conn.id] ?? 0;
+    const hasClosedGroundPath = Boolean(isGrounded[srcPin] || isGrounded[tgtPin]);
+    const hasCurrentFlow = Math.abs(edgeCurrent) > 1e-7 && hasClosedGroundPath;
+    const hasEnergizedVoltage = srcVoltage >= 1.5 || tgtVoltage >= 1.5;
+    edgeStates[conn.id] = hasCurrentFlow || hasEnergizedVoltage ? 1 : 0;
   }
 
   // 5. Strict I2C device validation.
